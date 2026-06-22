@@ -4,3 +4,6 @@
 [submodule "modules/game_one"]
 	path = modules/game_one
 	url = https://github.com/nanaki1984/GDGameOne-module
+[submodule "project"]
+	path = project
+	url = https://github.com/nanaki1984/GDGameOne-project
