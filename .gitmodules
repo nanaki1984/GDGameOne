@@ -1,3 +1,6 @@
 [submodule "tracy"]
 	path = tracy
 	url = https://github.com/wolfpld/tracy
+[submodule "modules/game_one"]
+	path = modules/game_one
+	url = https://github.com/nanaki1984/GDGameOne-module
