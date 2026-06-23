@@ -43,7 +43,7 @@
 // Otherwise, it grows exponentially (the default and what you want in most cases).
 template <typename T, typename U = uint32_t, bool force_trivial = false, bool tight = false>
 class LocalVector {
-	static_assert(!force_trivial, "force_trivial is no longer supported. Use resize_uninitialized instead.");
+	//static_assert(!force_trivial, "force_trivial is no longer supported. Use resize_uninitialized instead.");
 
 private:
 	U count = 0;
@@ -53,7 +53,7 @@ private:
 	template <bool p_init>
 	void _resize(U p_size) {
 		if (p_size < count) {
-			if constexpr (!std::is_trivially_destructible_v<T>) {
+			if constexpr (!force_trivial && !std::is_trivially_destructible_v<T>) {
 				for (U i = p_size; i < count; i++) {
 					data[i].~T();
 				}
@@ -61,11 +61,11 @@ private:
 			count = p_size;
 		} else if (p_size > count) {
 			reserve(p_size);
-			if constexpr (p_init) {
+			if constexpr (!force_trivial && p_init) {
 				memnew_arr_placement(data + count, p_size - count);
-			} else {
+			}/* else {
 				static_assert(std::is_trivially_destructible_v<T>, "T must be trivially destructible to resize uninitialized");
-			}
+			}*/
 			count = p_size;
 		}
 	}
@@ -93,7 +93,9 @@ public:
 		for (U i = p_index; i < count; i++) {
 			data[i] = std::move(data[i + 1]);
 		}
-		data[count].~T();
+		if constexpr (!force_trivial) {
+			data[count].~T();
+		}
 	}
 
 	/// Removes the item copying the last value into the position of the one to
@@ -104,7 +106,9 @@ public:
 		if (count > p_index) {
 			data[p_index] = std::move(data[count]);
 		}
-		data[count].~T();
+		if constexpr (!force_trivial) {
+			data[count].~T();
+		}
 	}
 
 	_FORCE_INLINE_ bool erase(const T &p_val) {
