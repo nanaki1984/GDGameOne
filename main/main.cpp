@@ -4354,8 +4354,12 @@ int Main::start() {
 #endif
 
 	MainLoop *main_loop = nullptr;
-	if (editor) {
-		main_loop = memnew(SceneTree);
+	if (forced_main_loop_type.is_empty()) {
+		if (editor) {
+			main_loop = memnew(SceneTree);
+		}
+	} else {
+		main_loop_type = forced_main_loop_type;
 	}
 	if (main_loop_type.is_empty()) {
 		main_loop_type = GLOBAL_GET("application/run/main_loop_type");
@@ -4902,6 +4906,8 @@ uint32_t Main::frame = 0;
 bool Main::force_redraw_requested = false;
 int Main::iterating = 0;
 
+String Main::forced_main_loop_type{ };
+
 bool Main::is_iterating() {
 	return iterating > 0;
 }
@@ -5395,4 +5401,8 @@ void Main::cleanup(bool p_force) {
 	OS::get_singleton()->benchmark_dump();
 
 	OS::get_singleton()->finalize_core();
+}
+
+void Main::force_main_loop_type(const String& p_forced_main_loop_type) {
+	forced_main_loop_type = p_forced_main_loop_type;
 }

@@ -58,6 +58,8 @@ class Main {
 	static bool force_redraw_requested;
 	static int iterating;
 
+	static String forced_main_loop_type;
+
 public:
 	static bool is_cmdline_tool();
 #ifdef TOOLS_ENABLED
@@ -83,6 +85,9 @@ public:
 	static bool is_iterating();
 
 	static void cleanup(bool p_force = false);
+
+	static void force_main_loop_type(const String& p_forced_main_loop_type);
+
 };
 
 // Test main override is for the testing behavior.
