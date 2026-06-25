@@ -193,6 +193,13 @@
 				Returns a list of the currently selected subgizmos. Can be used to highlight selected elements during [method _redraw].
 			</description>
 		</method>
+		<method name="set_subgizmo_selection">
+			<return type="void" />
+			<param index="0" name="ids" type="PackedInt32Array" />
+			<description>
+				Sets the selected subgizmos. The [param ids] should be an array of unique subgizmo identifiers, which can be any non-negative value. See also [method _get_subgizmo_transform] and [method _commit_subgizmos].
+			</description>
+		</method>
 		<method name="is_selected" qualifiers="const">
 			<return type="bool" />
 			<description>
