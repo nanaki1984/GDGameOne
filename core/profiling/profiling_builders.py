@@ -10,6 +10,7 @@ def profiler_gen_builder(target, source, env):
             if env["profiler_sample_callstack"]:
                 file.write("#define TRACY_CALLSTACK 62\n")
             if env["profiler_track_memory"]:
+                file.write("#define TRACY_IGNORE_MEMORY_FAULTS\n")
                 file.write("#define GODOT_PROFILER_TRACK_MEMORY\n")
             if env["profiler_record_on_demand"]:
                 file.write("#define TRACY_ON_DEMAND\n")
