@@ -1,10 +1,6 @@
 name: 🤖 Android Builds
 on:
   workflow_call:
-    secrets:
-      SERVICE_ACCOUNT_KEY:
-        required: true
-
   workflow_dispatch:
 
 # Global Settings
