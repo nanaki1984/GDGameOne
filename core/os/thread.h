@@ -108,7 +108,6 @@ private:
 	ID id = UNASSIGNED_ID;
 
 	static inline SafeFlag is_main_thread_assigned{ false };
-	static SafeNumeric<uint64_t> id_counter;
 	static thread_local ID caller_id;
 	THREADING_NAMESPACE::thread thread;
 
