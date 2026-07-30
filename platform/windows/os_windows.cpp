@@ -400,6 +400,12 @@ void OS_Windows::finalize_core() {
 #endif
 }
 
+Error OS_Windows::get_uuid(uint8_t *r_buffer) {
+	HRESULT result = CoCreateGuid(reinterpret_cast<GUID*>(r_buffer));
+	ERR_FAIL_COND_V(result != S_OK, FAILED);
+	return OK;
+}
+
 Error OS_Windows::get_entropy(uint8_t *r_buffer, int p_bytes) {
 	NTSTATUS status = BCryptGenRandom(nullptr, r_buffer, p_bytes, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
 	ERR_FAIL_COND_V(status, FAILED);

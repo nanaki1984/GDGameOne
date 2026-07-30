@@ -180,6 +180,7 @@ public:
 		RENDERING_DRIVER_METAL,
 	};
 
+	Vector4i get_uuid();
 	PackedByteArray get_entropy(int p_bytes);
 	String get_system_ca_certificates();
 

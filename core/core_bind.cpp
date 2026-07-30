@@ -294,6 +294,13 @@ void OS::LoggerBind::log_error(const char *p_function, const char *p_file, int p
 	}
 }
 
+Vector4i OS::get_uuid() {
+	Vector4i ret;
+	Error err = ::OS::get_singleton()->get_uuid(reinterpret_cast<uint8_t*>(&ret));
+	ERR_FAIL_COND_V(err != OK, ret);
+	return ret;
+}
+
 PackedByteArray OS::get_entropy(int p_bytes) {
 	PackedByteArray pba;
 	pba.resize(p_bytes);
@@ -762,6 +769,7 @@ void OS::remove_script_loggers(const ScriptLanguage *p_script) {
 }
 
 void OS::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_uuid"), &OS::get_uuid);
 	ClassDB::bind_method(D_METHOD("get_entropy", "size"), &OS::get_entropy);
 	ClassDB::bind_method(D_METHOD("get_system_ca_certificates"), &OS::get_system_ca_certificates);
 	ClassDB::bind_method(D_METHOD("get_connected_midi_inputs"), &OS::get_connected_midi_inputs);

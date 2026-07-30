@@ -78,6 +78,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <uuid/uuid.h>
 
 #include <cerrno>
 #include <csignal>
@@ -277,6 +278,11 @@ OS_Unix::StdHandleType OS_Unix::get_stderr_type() const {
 		return STD_HANDLE_FILE;
 	}
 	return STD_HANDLE_UNKNOWN;
+}
+
+Error OS_Unix::get_uuid(uint8_t *r_buffer) {
+	uuid_generate(r_buffer);
+	return OK;
 }
 
 Error OS_Unix::get_entropy(uint8_t *r_buffer, int p_bytes) {
