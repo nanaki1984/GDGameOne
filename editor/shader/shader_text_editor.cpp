@@ -32,6 +32,7 @@
 
 #include "core/config/project_settings.h"
 #include "core/object/callable_mp.h"
+#include "core/string/regex.h"
 #include "editor/docks/inspector_dock.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
@@ -55,8 +56,6 @@
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/shader_preprocessor.h"
 #include "servers/rendering/shader_types.h"
-
-#include "modules/regex/regex.h"
 
 /*** SHADER PREVIEW LINE LAYER ****/
 
@@ -766,7 +765,9 @@ void ShaderTextEditor::_notification(int p_what) {
 			Ref<StyleBoxFlat> tab_style = get_theme_stylebox(SNAME("tab_selected"), "TabBar");
 			Ref<StyleBoxFlat> preview_style = memnew(StyleBoxFlat);
 			preview_style->set_bg_color(get_theme_color(SNAME("dark_color_1"), EditorStringName(Editor)));
-			preview_style->set_corner_radius_all(tab_style->get_corner_radius(CORNER_TOP_LEFT));
+			if (tab_style.is_valid()) {
+				preview_style->set_corner_radius_all(tab_style->get_corner_radius(CORNER_TOP_LEFT));
+			}
 			preview_panel->add_theme_style_override(SceneStringName(panel), preview_style);
 
 			update_params_btn->set_button_icon(get_editor_theme_icon(SNAME("Reload")));
@@ -792,6 +793,10 @@ void ShaderTextEditor::_shader_changed() {
 	}
 	dependencies_changed = true;
 	_validate_script();
+	if (edited_res->is_built_in() && previous_name != get_document_name()) {
+		previous_name = get_document_name();
+		emit_signal(SNAME("name_changed"));
+	}
 }
 
 void ShaderTextEditor::_clear_previews() {
@@ -1263,13 +1268,15 @@ void ShaderTextEditor::set_edited_resource(const Ref<Resource> &p_res) {
 	if (p_res.is_null() || edited_res == p_res) {
 		return;
 	}
+	if (edited_res.is_valid()) {
+		edited_res->disconnect_changed(callable_mp(this, &ShaderTextEditor::_shader_changed));
+	}
+
 	Ref<Shader> shader = p_res;
 	Ref<ShaderInclude> shader_inc = p_res;
 	if (shader.is_null() && shader_inc.is_null()) {
 		return;
 	}
-
-	p_res->disconnect_changed(callable_mp(this, &ShaderTextEditor::_shader_changed));
 
 	edited_res = p_res;
 	_load_theme_settings();
@@ -1289,7 +1296,7 @@ void ShaderTextEditor::set_edited_resource(const Ref<Resource> &p_res) {
 	_validate_script();
 	code_editor->update_line_and_column();
 
-	p_res->connect_changed(callable_mp(this, &ShaderTextEditor::_shader_changed));
+	edited_res->connect_changed(callable_mp(this, &ShaderTextEditor::_shader_changed));
 }
 
 void ShaderTextEditor::goto_line_centered(int p_line, int p_column) {
