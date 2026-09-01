@@ -723,6 +723,10 @@ void vertex_shader(vec4 vertex_angle_attrib_input,
 
 	float point_size = 1.0;
 
+#ifdef LIGHT_VERTEX_USED
+	vec3 light_vertex = vertex;
+#endif //LIGHT_VERTEX_USED
+
 	{
 #CODE : VERTEX
 	}
@@ -733,6 +737,9 @@ void vertex_shader(vec4 vertex_angle_attrib_input,
 #if !defined(SKIP_TRANSFORM_USED) && !defined(VERTEX_WORLD_COORDS_USED)
 
 	vertex = (modelview * vec4(vertex, 1.0)).xyz;
+#ifdef LIGHT_VERTEX_USED
+	light_vertex = (modelview * vec4(light_vertex, 1.0)).xyz;
+#endif //LIGHT_VERTEX_USED
 
 #ifdef NORMAL_USED
 	// For correct non-uniform scale handling, normal has to be transformed by normal matrix, but tangent vectors need to use model matrix as is
@@ -750,6 +757,10 @@ void vertex_shader(vec4 vertex_angle_attrib_input,
 #if !defined(SKIP_TRANSFORM_USED) && defined(VERTEX_WORLD_COORDS_USED)
 
 	vertex = (scene_data_input.view_matrix * vec4(vertex, 1.0)).xyz;
+#ifdef LIGHT_VERTEX_USED
+	light_vertex = (scene_data_input.view_matrix * vec4(light_vertex, 1.0)).xyz;
+#endif //LIGHT_VERTEX_USED
+
 #ifdef NORMAL_USED
 	normal = (scene_data_input.view_matrix * vec4(normal, 0.0)).xyz;
 #endif
@@ -774,38 +785,42 @@ void vertex_shader(vec4 vertex_angle_attrib_input,
 
 #ifndef RENDER_MOTION_VECTORS
 	// Calculate shadows.
+#ifndef LIGHT_VERTEX_USED
+	vec3 light_vertex = vertex_interp;
+#endif
+
 #ifdef USE_ADDITIVE_LIGHTING
 #if defined(ADDITIVE_OMNI) || defined(ADDITIVE_SPOT)
 	// Apply normal bias at draw time to avoid issues with scaling non-fused geometry.
-	vec3 light_rel_vec = positional_shadows[positional_shadow_index].light_position - vertex_interp;
+	vec3 light_rel_vec = positional_shadows[positional_shadow_index].light_position - light_vertex;
 	float light_length = length(light_rel_vec);
 	float aNdotL = abs(dot(normalize(normal_interp), normalize(light_rel_vec)));
 	vec3 normal_offset = (1.0 - aNdotL) * positional_shadows[positional_shadow_index].shadow_normal_bias * light_length * normal_interp;
 
 #ifdef ADDITIVE_SPOT
 	// Calculate coord here so we can take advantage of prefetch.
-	shadow_coord = positional_shadows[positional_shadow_index].shadow_matrix * vec4(vertex_interp + normal_offset, 1.0);
+	shadow_coord = positional_shadows[positional_shadow_index].shadow_matrix * vec4(light_vertex + normal_offset, 1.0);
 #endif
 
 #ifdef ADDITIVE_OMNI
 	// Can't interpolate unit direction nicely, so forget about prefetch.
-	shadow_coord = vec4(vertex_interp + normal_offset, 1.0);
+	shadow_coord = vec4(light_vertex + normal_offset, 1.0);
 #endif
 #else // ADDITIVE_DIRECTIONAL
 	vec3 base_normal_bias = normalize(normal_interp) * (1.0 - max(0.0, dot(directional_shadows[directional_shadow_index].direction, -normalize(normal_interp))));
 	vec3 normal_offset = base_normal_bias * directional_shadows[directional_shadow_index].shadow_normal_bias.x;
-	shadow_coord = directional_shadows[directional_shadow_index].shadow_matrix1 * vec4(vertex_interp + normal_offset, 1.0);
+	shadow_coord = directional_shadows[directional_shadow_index].shadow_matrix1 * vec4(light_vertex + normal_offset, 1.0);
 
 #if defined(LIGHT_USE_PSSM2) || defined(LIGHT_USE_PSSM4)
 	normal_offset = base_normal_bias * directional_shadows[directional_shadow_index].shadow_normal_bias.y;
-	shadow_coord2 = directional_shadows[directional_shadow_index].shadow_matrix2 * vec4(vertex_interp + normal_offset, 1.0);
+	shadow_coord2 = directional_shadows[directional_shadow_index].shadow_matrix2 * vec4(light_vertex + normal_offset, 1.0);
 #endif
 
 #ifdef LIGHT_USE_PSSM4
 	normal_offset = base_normal_bias * directional_shadows[directional_shadow_index].shadow_normal_bias.z;
-	shadow_coord3 = directional_shadows[directional_shadow_index].shadow_matrix3 * vec4(vertex_interp + normal_offset, 1.0);
+	shadow_coord3 = directional_shadows[directional_shadow_index].shadow_matrix3 * vec4(light_vertex + normal_offset, 1.0);
 	normal_offset = base_normal_bias * directional_shadows[directional_shadow_index].shadow_normal_bias.w;
-	shadow_coord4 = directional_shadows[directional_shadow_index].shadow_matrix4 * vec4(vertex_interp + normal_offset, 1.0);
+	shadow_coord4 = directional_shadows[directional_shadow_index].shadow_matrix4 * vec4(light_vertex + normal_offset, 1.0);
 #endif //LIGHT_USE_PSSM4
 
 #endif // !(defined(ADDITIVE_OMNI) || defined(ADDITIVE_SPOT))

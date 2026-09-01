@@ -471,6 +471,10 @@ void vertex_shader(in vec3 vertex,
 	float point_size = 1.0;
 #endif
 
+#ifdef LIGHT_VERTEX_USED
+	vec3 light_vertex = vertex;
+#endif //LIGHT_VERTEX_USED
+
 	{
 #CODE : VERTEX
 	}
