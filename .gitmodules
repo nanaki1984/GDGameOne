@@ -7,3 +7,6 @@
 [submodule "project"]
 	path = project
 	url = https://github.com/nanaki1984/GDGameOne-project
+[submodule "modules/limboai"]
+	path = modules/limboai
+	url = https://github.com/nanaki1984/limboai
