@@ -428,6 +428,31 @@ public:
 	AnimationNodeOutput();
 };
 
+class AnimationNodeStore : public AnimationNode {
+	GDCLASS(AnimationNodeStore, AnimationNode);
+
+public:
+	virtual String get_caption() const override;
+	virtual NodeTimeInfo _process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only = false) override;
+	AnimationNodeStore();
+};
+
+class AnimationNodeLoad : public AnimationNode {
+	GDCLASS(AnimationNodeLoad, AnimationNode);
+
+	StringName store_path = "store_path";
+
+public:
+	virtual void validate_node(const AnimationTree *p_tree, const StringName &p_path) const override;
+
+	void get_parameter_list(LocalVector<PropertyInfo> *r_list) const override;
+	virtual Variant get_parameter_default_value(const StringName &p_parameter) const override;
+
+	virtual String get_caption() const override;
+	virtual NodeTimeInfo _process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only = false) override;
+	AnimationNodeLoad();
+};
+
 /////
 
 class AnimationNodeBlendTree : public AnimationRootNode {

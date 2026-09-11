@@ -106,8 +106,18 @@ void AnimationNode::get_child_nodes(LocalVector<ChildNode> *r_child_nodes) {
 }
 
 void AnimationNode::blend_animation(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName &p_animation, AnimationMixer::PlaybackInfo &p_playback_info) {
-	p_playback_info.track_weights = &p_instance.track_weights;
-	p_process_state.tree->make_animation_instance(p_animation, p_playback_info);
+	const Ref<Animation> &animation = p_process_state.tree->get_animation_or_null(p_animation);
+	ERR_FAIL_COND(animation.is_null());
+
+	AnimationMixer::AnimationInstance ai;
+	ai.animation = animation;
+	ai.playback_info = p_playback_info;
+	ai.track_weights = p_instance.track_weights;
+	ai.flags = AnimationMixer::AI_FLAGS_DEFAULT;
+
+	for (auto instance : p_process_state.cache_ai_instances) {
+		instance->last_ai_cache.add(ai);
+	}
 }
 
 AnimationNode::NodeTimeInfo AnimationNode::_pre_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
@@ -139,7 +149,7 @@ void AnimationNode::make_invalid(ProcessState &p_process_state, AnimationNodeIns
 	invalid_instance.errors.push_back(p_reason);
 }
 
-AnimationNode::NodeTimeInfo AnimationNode::blend_input(ProcessState &p_process_state, AnimationNodeInstance &p_instance, int p_input, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter, bool p_sync, bool p_test_only) {
+AnimationNode::NodeTimeInfo AnimationNode::blend_input(ProcessState &p_process_state, AnimationNodeInstance &p_instance, int p_input, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter, bool p_sync, bool p_test_only, bool p_cache) {
 	ERR_FAIL_INDEX_V(p_input, (int64_t)inputs.size(), NodeTimeInfo());
 
 	AnimationNodeInstance *node_instance = nullptr;
@@ -154,6 +164,10 @@ AnimationNode::NodeTimeInfo AnimationNode::blend_input(ProcessState &p_process_s
 	}
 
 	real_t activity = 0.0;
+
+	if (!p_test_only && p_cache) {
+		node_instance->cache_ai_this_frame = true;
+	}
 
 	NodeTimeInfo nti = _blend_node(p_process_state, p_instance, *node_instance, p_playback_info, p_filter, p_sync, p_test_only, &activity);
 
@@ -269,6 +283,33 @@ AnimationNode::NodeTimeInfo AnimationNode::_blend_node(ProcessState &p_process_s
 	return p_other.resource->_pre_process(p_process_state, p_other, p_playback_info, p_test_only);
 }
 
+AnimationNode::NodeTimeInfo AnimationNode::blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance *p_other, float p_weight, bool p_seek, bool p_test_only) {
+	ERR_FAIL_NULL_V(p_other, NodeTimeInfo());
+	return _blend_cache(p_process_state, p_instance, *p_other, p_weight, p_seek, p_test_only);
+}
+
+AnimationNode::NodeTimeInfo AnimationNode::_blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance &p_other, float p_weight, bool p_seek, bool p_test_only) {
+	if (p_test_only) {
+		return NodeTimeInfo();
+	}
+
+	for (const auto& ai : p_other.last_ai_cache.instances) {
+		AnimationMixer::AnimationInstance new_ai = ai;
+
+		new_ai.playback_info.weight *= p_weight;
+		if (p_seek) {
+			new_ai.playback_info.seeked = p_seek;
+			new_ai.playback_info.is_external_seeking = false;
+			new_ai.flags = AnimationMixer::AI_FLAGS_NONE;
+		}
+
+		for (auto instance : p_process_state.cache_ai_instances) {
+			instance->last_ai_cache.add(new_ai);
+		}
+	}
+	return p_other.last_nti_cache;
+}
+
 String AnimationNode::get_caption() const {
 	String ret = "Node";
 	GDVIRTUAL_CALL(_get_caption, ret);
@@ -336,9 +377,25 @@ AnimationNode::NodeTimeInfo AnimationNode::process(ProcessState &p_process_state
 		pi.time = position + get_process_delta(p_instance, p_playback_info);
 	}
 
+	if (!p_test_only) {
+		if (p_instance.cache_ai_this_frame) {
+			p_instance.last_ai_cache.clear();
+			p_process_state.cache_ai_instances.push_back(&p_instance);
+		}
+	}
+
 	NodeTimeInfo nti = _process(p_process_state, p_instance, pi, p_test_only);
 
 	if (!p_test_only) {
+		if (p_instance.cache_ai_this_frame) {
+			const auto size = p_process_state.cache_ai_instances.size();
+			CRASH_COND(size == 0 || p_process_state.cache_ai_instances[size - 1] != &p_instance);
+			p_process_state.cache_ai_instances.remove_at_unordered(size - 1);
+
+			p_instance.last_nti_cache = nti;
+			p_instance.cache_ai_this_frame = false;
+		}
+
 		length = nti.length;
 		position = nti.position;
 		delta = nti.delta;
@@ -502,7 +559,7 @@ double AnimationNode::blend_node_ex(const StringName &p_sub_path, const Ref<Anim
 	return nti.length - nti.position;
 }
 
-double AnimationNode::blend_input_ex(int p_input, double p_time, bool p_seek, bool p_is_external_seeking, real_t p_blend, FilterAction p_filter, bool p_sync, bool p_test_only) {
+double AnimationNode::blend_input_ex(int p_input, double p_time, bool p_seek, bool p_is_external_seeking, real_t p_blend, FilterAction p_filter, bool p_sync, bool p_test_only, bool p_cache) {
 	ERR_FAIL_NULL_V(tls_process_state, 0.0);
 	ERR_FAIL_NULL_V(current_instance, 0.0);
 
@@ -512,7 +569,7 @@ double AnimationNode::blend_input_ex(int p_input, double p_time, bool p_seek, bo
 	info.is_external_seeking = p_is_external_seeking;
 	info.weight = p_blend;
 
-	NodeTimeInfo nti = blend_input(*tls_process_state, *current_instance, p_input, info, p_filter, p_sync, p_test_only);
+	NodeTimeInfo nti = blend_input(*tls_process_state, *current_instance, p_input, info, p_filter, p_sync, p_test_only, p_cache);
 	return nti.length - nti.position;
 }
 
@@ -567,7 +624,7 @@ void AnimationNode::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("blend_animation", "animation", "time", "delta", "seeked", "is_external_seeking", "blend", "looped_flag"), &AnimationNode::blend_animation_ex, DEFVAL(Animation::LOOPED_FLAG_NONE));
 	ClassDB::bind_method(D_METHOD("blend_node", "name", "node", "time", "seek", "is_external_seeking", "blend", "filter", "sync", "test_only"), &AnimationNode::blend_node_ex, DEFVAL(FILTER_IGNORE), DEFVAL(true), DEFVAL(false));
-	ClassDB::bind_method(D_METHOD("blend_input", "input_index", "time", "seek", "is_external_seeking", "blend", "filter", "sync", "test_only"), &AnimationNode::blend_input_ex, DEFVAL(FILTER_IGNORE), DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("blend_input", "input_index", "time", "seek", "is_external_seeking", "blend", "filter", "sync", "test_only", "cache"), &AnimationNode::blend_input_ex, DEFVAL(false), DEFVAL(FILTER_IGNORE), DEFVAL(true), DEFVAL(false));
 
 	ClassDB::bind_method(D_METHOD("set_parameter", "name", "value"), &AnimationNode::set_parameter_ex);
 	ClassDB::bind_method(D_METHOD("get_parameter", "name"), &AnimationNode::get_parameter_ex);
@@ -691,6 +748,10 @@ bool AnimationTree::_blend_pre_process(double p_delta, int p_track_count, const 
 		process_state.track_map_updated = track_map_version != last_track_map_version;
 		process_state.is_testing = false;
 
+		process_state.original_delta = p_delta;
+		process_state.track_count = p_track_count;
+		process_state.tree_just_started = started;
+
 		last_track_map_version = track_map_version;
 
 		// Init node state for root AnimationNode.
@@ -701,6 +762,8 @@ bool AnimationTree::_blend_pre_process(double p_delta, int p_track_count, const 
 		}
 		instance.blended = true;
 		instance.path = SNAME(Animation::PARAMETERS_BASE_PATH.ascii().get_data());
+
+		instance.cache_ai_this_frame = true;
 	}
 
 	// Process.
@@ -724,6 +787,8 @@ bool AnimationTree::_blend_pre_process(double p_delta, int p_track_count, const 
 	if (!process_state.valid) {
 		return false; // State is not valid, abort process.
 	}
+
+	make_animation_instances(instance.last_ai_cache);
 
 	return true;
 }

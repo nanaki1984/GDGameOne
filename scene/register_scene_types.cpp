@@ -623,6 +623,8 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AnimationNodeTimeSeek);
 	GDREGISTER_CLASS(AnimationNodeTransition);
 	GDREGISTER_CLASS(AnimationNodeObserverTransition);
+	GDREGISTER_CLASS(AnimationNodeStore);
+	GDREGISTER_CLASS(AnimationNodeLoad);
 
 	GDREGISTER_CLASS(ShaderGlobalsOverride); // can be used in any shader
 

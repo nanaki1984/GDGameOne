@@ -1177,7 +1177,7 @@ void AnimationMixer::_blend_calc_total_weight() {
 		if (Math::is_zero_approx(weight)) {
 			continue;
 		}
-		Span<real_t> track_weights = ai.playback_info.track_weights != nullptr ? *ai.playback_info.track_weights : Span<real_t>();
+		const auto& track_weights = ai.track_weights;
 
 		LocalVector<TrackCache *> *t_cache = animation_track_num_to_track_cache.getptr(a);
 		ERR_CONTINUE_EDMSG(!t_cache, "No animation in cache.");
@@ -1271,7 +1271,7 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 			int blend_idx = track->blend_idx;
 			ERR_CONTINUE(blend_idx < 0 || blend_idx >= track_count);
 			real_t blend;
-			Span<real_t> track_weights = ai.playback_info.track_weights != nullptr ? *ai.playback_info.track_weights : Span<real_t>();
+			const auto& track_weights = ai.track_weights;
 			if (!track_weights.is_empty() && blend_idx < static_cast<int>(track_weights.size())) {
 				blend = track_weights[blend_idx] * weight;
 			} else {
@@ -1295,7 +1295,7 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 						continue; // Nothing to blend.
 					}
 					TrackCacheTransform *t = static_cast<TrackCacheTransform *>(track);
-					if (track->root_motion && calc_root) {
+					if (track->root_motion && calc_root && (ai.flags & AI_FLAGS_ROOT_MOTION)) {
 						int rot_track = -1;
 						if (root_motion_local) {
 							rot_track = a->find_track(a->track_get_path(i), Animation::TYPE_ROTATION_3D);
@@ -1438,7 +1438,7 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 						continue; // Nothing to blend.
 					}
 					TrackCacheTransform *t = static_cast<TrackCacheTransform *>(track);
-					if (track->root_motion && calc_root) {
+					if (track->root_motion && calc_root && (ai.flags & AI_FLAGS_ROOT_MOTION)) {
 						double prev_time = time - delta;
 						if (!backward) {
 							if (Animation::is_less_approx(prev_time, start)) {
@@ -1526,7 +1526,7 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 						continue; // Nothing to blend.
 					}
 					TrackCacheTransform *t = static_cast<TrackCacheTransform *>(track);
-					if (track->root_motion && calc_root) {
+					if (track->root_motion && calc_root && (ai.flags & AI_FLAGS_ROOT_MOTION)) {
 						double prev_time = time - delta;
 						if (!backward) {
 							if (Animation::is_less_approx(prev_time, start)) {
@@ -1705,7 +1705,7 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 				} break;
 				case Animation::TYPE_METHOD: {
 #ifdef TOOLS_ENABLED
-					if (!can_call) {
+					if (!can_call || !(ai.flags & AI_FLAGS_METHODS)) {
 						continue;
 					}
 #endif // TOOLS_ENABLED
@@ -1755,7 +1755,7 @@ void AnimationMixer::_blend_process(double p_delta, bool p_update_only) {
 					AHashMap<int, PlayingAudioStreamInfo> &map = track_info.stream_info;
 
 					// Main process to fire key is started from here.
-					if (p_update_only) {
+					if (p_update_only || !(ai.flags & AI_FLAGS_AUDIO)) {
 						continue;
 					}
 					// Find stream.
@@ -2105,15 +2105,23 @@ void AnimationMixer::_call_object(ObjectID p_object_id, const StringName &p_meth
 	}
 }
 
-void AnimationMixer::make_animation_instance(const StringName &p_name, const PlaybackInfo &p_playback_info) {
+void AnimationMixer::make_animation_instance(const StringName &p_name, const PlaybackInfo &p_playback_info, Span<real_t> p_track_weights/* = {}*/, uint32_t p_flags/* = AI_FLAGS_DEFAULT*/) {
 	const Ref<Animation> &animation = get_animation_or_null(p_name);
 	ERR_FAIL_COND(animation.is_null());
 
 	AnimationInstance ai;
 	ai.animation = animation;
 	ai.playback_info = p_playback_info;
+	ai.track_weights = p_track_weights;
+	ai.flags = p_flags;
 
 	animation_instances.push_back(std::move(ai));
+}
+
+void AnimationMixer::make_animation_instances(const AnimationInstanceCache& p_ai_cache) {
+	for (const auto& ai : p_ai_cache.instances) {
+		animation_instances.push_back(ai);
+	}
 }
 
 void AnimationMixer::clear_animation_instances() {

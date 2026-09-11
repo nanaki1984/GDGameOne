@@ -136,6 +136,15 @@ public:
 		bool is_testing = false;
 		bool valid = false;
 		mutable AHashMap<StringName, InvalidInstance> invalid_instances;
+
+		LocalVector<AnimationNodeInstance*> cache_ai_instances;
+
+		AHashMap<StringName, AnimationNodeInstance*> stores;
+
+		double original_delta;
+		int track_count;
+		bool tree_just_started = false;
+
 		uint64_t last_pass = 0;
 	};
 
@@ -160,6 +169,8 @@ public:
 	NodeTimeInfo _blend_node(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance &p_other, AnimationMixer::PlaybackInfo p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, real_t *r_activity = nullptr);
 	NodeTimeInfo _pre_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only = false);
 
+	NodeTimeInfo _blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance &p_other, float p_weight = 1.0, bool p_seek = false, bool p_test_only = false);
+
 protected:
 	StringName current_length = "current_length";
 	StringName current_position = "current_position";
@@ -175,12 +186,14 @@ protected:
 
 	void blend_animation(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName &p_animation, AnimationMixer::PlaybackInfo &p_playback_info);
 	NodeTimeInfo blend_node(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance *p_other, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false);
-	NodeTimeInfo blend_input(ProcessState &p_process_state, AnimationNodeInstance &p_instance, int p_input, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false);
+	NodeTimeInfo blend_input(ProcessState &p_process_state, AnimationNodeInstance &p_instance, int p_input, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, bool p_cache = false);
+
+	NodeTimeInfo blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance *p_other, float p_weight = 1.0, bool p_seek = false, bool p_test_only = false);
 
 	// Bind-able methods to expose for compatibility, moreover AnimationMixer::PlaybackInfo is not exposed.
 	void blend_animation_ex(const StringName &p_animation, double p_time, double p_delta, bool p_seeked, bool p_is_external_seeking, real_t p_blend, Animation::LoopedFlag p_looped_flag = Animation::LOOPED_FLAG_NONE);
 	double blend_node_ex(const StringName &p_sub_path, const Ref<AnimationNode> &p_node, double p_time, bool p_seek, bool p_is_external_seeking, real_t p_blend, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false);
-	double blend_input_ex(int p_input, double p_time, bool p_seek, bool p_is_external_seeking, real_t p_blend, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false);
+	double blend_input_ex(int p_input, double p_time, bool p_seek, bool p_is_external_seeking, real_t p_blend, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, bool p_cache = false);
 
 	void add_validation_error(const AnimationTree *p_tree, const StringName &p_path, const String &p_error, int p_input_index = -1) const;
 	void make_invalid(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const String &p_reason);
@@ -299,6 +312,11 @@ struct AnimationNodeInstance {
 	StringName path; // e.g. "parameters/node_name/sub_node_name/"
 
 	mutable AHashMap<StringName, Variant *> property_ptrs;
+
+	// ai caches
+	mutable AnimationMixer::AnimationInstanceCache last_ai_cache;
+	mutable AnimationNode::NodeTimeInfo last_nti_cache;
+	mutable bool cache_ai_this_frame = false;
 
 #ifdef ENABLE_ACTIVITY_TRACKING
 	struct Activity {

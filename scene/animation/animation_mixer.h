@@ -90,12 +90,64 @@ public:
 		bool is_external_seeking = false;
 		Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
 		real_t weight = 0.0;
-		LocalVector<real_t> *track_weights = nullptr;
+	};
+
+	enum AnimationInstanceFlags {
+		AI_FLAGS_NONE = 0,
+
+		AI_FLAGS_ROOT_MOTION = 1 << 0,
+		AI_FLAGS_METHODS = 1 << 1,
+		AI_FLAGS_AUDIO = 1 << 2,
+
+		AI_FLAGS_DEFAULT = AI_FLAGS_ROOT_MOTION | AI_FLAGS_METHODS | AI_FLAGS_AUDIO
 	};
 
 	struct AnimationInstance {
 		Ref<Animation> animation;
 		PlaybackInfo playback_info;
+		Span<real_t> track_weights;
+		uint32_t flags{ AI_FLAGS_DEFAULT };
+	};
+
+	struct AnimationInstanceCache {
+		LocalVector<AnimationInstance> instances;
+		LocalVector<real_t> weights_buffer;
+
+		// These are needed by AHashMap...weird
+		AnimationInstanceCache() = default;
+		AnimationInstanceCache(const AnimationInstanceCache &) = default;
+		AnimationInstanceCache& operator =(const AnimationInstanceCache &) = default;
+
+		AnimationInstanceCache(AnimationInstanceCache &&p_other) :
+			instances(std::move(p_other.instances)),
+			weights_buffer(std::move(p_other.weights_buffer)) { }
+		AnimationInstanceCache& operator =(AnimationInstanceCache &&p_other) {
+			instances = std::move(p_other.instances);
+			weights_buffer = std::move(p_other.weights_buffer);
+			return (*this);
+		}
+
+		_FORCE_INLINE_ void add(const AnimationInstance &p_ai) {
+			AnimationInstance ai = p_ai;
+			const auto track_weights_size = p_ai.track_weights.size();
+			if (track_weights_size > 0) {
+				weights_buffer.reserve(track_weights_size);
+				ai.track_weights = Span<real_t>{ weights_buffer.ptr() + weights_buffer.size(), track_weights_size };
+				for (auto w : p_ai.track_weights) {
+					weights_buffer.push_back(w);
+				}
+			}
+			instances.push_back(std::move(ai));
+		}
+
+		_FORCE_INLINE_ void clear() {
+			instances.clear();
+			weights_buffer.clear();
+		}
+
+		_FORCE_INLINE_ bool is_empty() const {
+			return instances.is_empty();
+		}
 	};
 
 protected:
@@ -455,7 +507,8 @@ public:
 	Vector3 get_root_motion_scale_accumulator() const;
 
 	/* ---- Blending processor ---- */
-	void make_animation_instance(const StringName &p_name, const PlaybackInfo &p_playback_info);
+	void make_animation_instance(const StringName &p_name, const PlaybackInfo &p_playback_info, Span<real_t> p_track_weights = {}, uint32_t p_flags = AI_FLAGS_DEFAULT);
+	void make_animation_instances(const AnimationInstanceCache& p_ai_cache);
 	void clear_animation_instances();
 	virtual void advance(double p_time);
 	virtual void clear_caches(); // Must be called by hand if an animation was modified after added.

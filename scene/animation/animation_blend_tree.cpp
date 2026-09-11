@@ -1545,6 +1545,93 @@ AnimationNodeOutput::AnimationNodeOutput() {
 	add_input("output");
 }
 
+/////////////////////
+
+String AnimationNodeStore::get_caption() const {
+	return "Store";
+}
+
+AnimationNode::NodeTimeInfo AnimationNodeStore::_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
+	return blend_input(p_process_state, p_instance, 0, p_playback_info, FILTER_IGNORE, true, p_test_only);
+}
+
+AnimationNodeStore::AnimationNodeStore() {
+	add_input("input");
+}
+
+void AnimationNodeLoad::validate_node(const AnimationTree *p_tree, const StringName &p_path) const {
+	auto instance = p_tree->get_node_instance_by_path_or_null(p_path);
+	CRASH_COND(!instance);
+	const String& store_path_val = instance->get_parameter(store_path);
+	if (!store_path_val.is_empty()) {
+		auto save_node_inst = p_tree->get_node_instance_by_path_or_null(Animation::PARAMETERS_BASE_PATH + store_path_val + "/");
+		if (!save_node_inst || save_node_inst->resource.is_null() || !save_node_inst->resource->is_class("AnimationNodeStore")) {
+			add_validation_error(p_tree, p_path, vformat(RTR("Save node '%s' not found."), store_path_val));
+		}
+	}
+}
+
+void AnimationNodeLoad::get_parameter_list(LocalVector<PropertyInfo> *r_list) const {
+	AnimationNode::get_parameter_list(r_list);
+	r_list->push_back(PropertyInfo(Variant::STRING, store_path, PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT));
+}
+
+Variant AnimationNodeLoad::get_parameter_default_value(const StringName &p_parameter) const {
+	Variant ret = AnimationNode::get_parameter_default_value(p_parameter);
+	if (ret != Variant()) {
+		return ret;
+	}
+	if (p_parameter == store_path) {
+		return "";
+	}
+	return 0.0;
+}
+
+String AnimationNodeLoad::get_caption() const {
+	return "Load";
+}
+
+AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
+	const String& store_path_val = p_instance.get_parameter(store_path);
+	auto it = p_process_state.stores.find(store_path_val);
+	if (it) {
+		return blend_cache(p_process_state, p_instance, it->value, p_test_only);
+	} else {
+		AnimationNodeInstance* store_path_inst = store_path_val.is_empty()
+			? nullptr
+			: p_process_state.tree->get_node_instance_by_path_or_null(Animation::PARAMETERS_BASE_PATH + store_path_val + "/");
+		if (!store_path_inst || store_path_inst->resource.is_null() || !store_path_inst->resource->is_class("AnimationNodeStore")) {
+			if (!p_test_only && p_instance.is_blended()) {
+				make_invalid(p_process_state, p_instance, vformat(RTR("Save node '%s' not found."), store_path_val));
+			}
+			return NodeTimeInfo();
+		}
+
+		p_process_state.stores[store_path_val] = store_path_inst;
+
+		store_path_inst->track_weights.resize(p_process_state.track_count);
+		real_t *src_blendsw = store_path_inst->track_weights.ptr();
+		for (int i = 0; i < p_process_state.track_count; i++) {
+			src_blendsw[i] = 1.0; // By default all go to 1 for the root input.
+		}
+		store_path_inst->blended = true;
+
+		AnimationMixer::PlaybackInfo pi;
+		pi.delta = p_process_state.original_delta;
+		pi.seeked = p_process_state.tree_just_started;
+		pi.weight = 1.0;
+
+		if (!p_test_only) {
+			store_path_inst->cache_ai_this_frame = true;
+		}
+
+		return store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, p_test_only);
+	}
+}
+
+AnimationNodeLoad::AnimationNodeLoad() {
+}
+
 ///////////////////////////////////////////////////////
 void AnimationNodeBlendTree::add_node(const StringName &p_name, const Ref<AnimationNode> &p_node, const Vector2 &p_position) {
 	ERR_FAIL_COND(nodes.has(p_name));

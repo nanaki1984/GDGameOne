@@ -191,11 +191,17 @@ void AnimationNodeBlendTreeEditor::update_graph_immediately() {
 			name->set_expand_to_text_length_enabled(true);
 			name->set_custom_minimum_size(Vector2(100, 0) * EDSCALE);
 			node->add_child(name);
-			node->set_slot(0, false, 0, Color(), true, read_only ? -1 : 0, get_theme_color(SceneStringName(font_color), SNAME("Label")));
 			name->connect(SceneStringName(text_submitted), callable_mp(this, &AnimationNodeBlendTreeEditor::_node_renamed).bind(agnode, E), CONNECT_DEFERRED);
 			name->connect(SceneStringName(focus_exited), callable_mp(this, &AnimationNodeBlendTreeEditor::_node_renamed_focus_out).bind(agnode, E), CONNECT_DEFERRED);
 			name->connect(SceneStringName(text_changed), callable_mp(this, &AnimationNodeBlendTreeEditor::_node_rename_lineedit_changed), CONNECT_DEFERRED);
+
+			if (agnode->is_class("AnimationNodeStore")) {
+				node->set_slot(0, false, 0, Color(), false, 0, Color());
+			} else {
+				node->set_slot(0, false, 0, Color(), true, read_only ? -1 : 0, get_theme_color(SceneStringName(font_color), SNAME("Label")));
+			}
 			base = 1;
+
 			agnode->set_deletable(true);
 
 			if (!read_only) {
@@ -1305,6 +1311,8 @@ AnimationNodeBlendTreeEditor::AnimationNodeBlendTreeEditor() {
 	add_options.push_back(AddOption("BlendSpace1D", "AnimationNodeBlendSpace1D"));
 	add_options.push_back(AddOption("BlendSpace2D", "AnimationNodeBlendSpace2D"));
 	add_options.push_back(AddOption("StateMachine", "AnimationNodeStateMachine"));
+	add_options.push_back(AddOption("Store", "AnimationNodeStore", 1));
+	add_options.push_back(AddOption("Load", "AnimationNodeLoad"));
 	_update_options_menu();
 	filter_dialog = memnew(AcceptDialog);
 	add_child(filter_dialog);
