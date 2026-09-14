@@ -1607,7 +1607,13 @@ AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_
 			return NodeTimeInfo();
 		}
 
-		p_process_state.stores[store_path_val] = store_path_inst;
+		// Re-entrancy test
+		if (store_path_inst->cache_ai_this_frame) {
+			if (!p_test_only && p_instance.is_blended()) {
+				make_invalid(p_process_state, p_instance, vformat(RTR("Detected loop for Save node '%s'."), store_path_val));
+			}
+			return NodeTimeInfo();
+		}
 
 		store_path_inst->track_weights.resize(p_process_state.track_count);
 		real_t *src_blendsw = store_path_inst->track_weights.ptr();
@@ -1625,7 +1631,11 @@ AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_
 			store_path_inst->cache_ai_this_frame = true;
 		}
 
-		return store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, p_test_only);
+		auto nti = store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, p_test_only);
+
+		p_process_state.stores[store_path_val] = store_path_inst;
+
+		return nti;
 	}
 }
 
