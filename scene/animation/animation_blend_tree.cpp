@@ -1562,7 +1562,7 @@ AnimationNodeStore::AnimationNodeStore() {
 void AnimationNodeLoad::validate_node(const AnimationTree *p_tree, const StringName &p_path) const {
 	auto instance = p_tree->get_node_instance_by_path_or_null(p_path);
 	CRASH_COND(!instance);
-	const String& store_path_val = instance->get_parameter(store_path);
+	const String& store_path_val = instance->get_parameter_store_path();
 	if (!store_path_val.is_empty()) {
 		auto save_node_inst = p_tree->get_node_instance_by_path_or_null(Animation::PARAMETERS_BASE_PATH + store_path_val + "/");
 		if (!save_node_inst || save_node_inst->resource.is_null() || !save_node_inst->resource->is_class("AnimationNodeStore")) {
@@ -1592,7 +1592,7 @@ String AnimationNodeLoad::get_caption() const {
 }
 
 AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
-	const String& store_path_val = p_instance.get_parameter(store_path);
+	const String& store_path_val = p_instance.get_parameter_store_path();
 	auto it = p_process_state.stores.find(store_path_val);
 	if (it) {
 		return blend_cache(p_process_state, p_instance, it->value, p_test_only);
@@ -1602,15 +1602,15 @@ AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_
 			: p_process_state.tree->get_node_instance_by_path_or_null(Animation::PARAMETERS_BASE_PATH + store_path_val + "/");
 		if (!store_path_inst || store_path_inst->resource.is_null() || !store_path_inst->resource->is_class("AnimationNodeStore")) {
 			if (!p_test_only && p_instance.is_blended()) {
-				make_invalid(p_process_state, p_instance, vformat(RTR("Save node '%s' not found."), store_path_val));
+				make_invalid(p_process_state, p_instance, vformat(RTR("Store node '%s' not found."), store_path_val));
 			}
 			return NodeTimeInfo();
 		}
 
 		// Re-entrancy test
-		if (store_path_inst->cache_ai_this_frame) {
+		if (p_process_state.anim_caches.has(store_path_inst)) {
 			if (!p_test_only && p_instance.is_blended()) {
-				make_invalid(p_process_state, p_instance, vformat(RTR("Detected loop for Save node '%s'."), store_path_val));
+				make_invalid(p_process_state, p_instance, vformat(RTR("Detected loop for Store node '%s'."), store_path_val));
 			}
 			return NodeTimeInfo();
 		}
@@ -1627,11 +1627,7 @@ AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_
 		pi.seeked = p_process_state.tree_just_started;
 		pi.weight = 1.0;
 
-		if (!p_test_only) {
-			store_path_inst->cache_ai_this_frame = true;
-		}
-
-		auto nti = store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, p_test_only);
+		auto nti = store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, p_test_only, true);
 
 		p_process_state.stores[store_path_val] = store_path_inst;
 
@@ -1843,7 +1839,7 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendTree::_process(ProcessState &p_pro
 	pi.weight = 1.0;
 
 	AnimationNodeInstance &output_instance = p_instance.get_child_instance_by_path(SceneStringName(output));
-	return _blend_node(p_process_state, p_instance, output_instance, pi, FILTER_IGNORE, true, p_test_only, nullptr);
+	return _blend_node(p_process_state, p_instance, output_instance, pi, FILTER_IGNORE, true, p_test_only);
 }
 
 LocalVector<StringName> AnimationNodeBlendTree::get_node_list() const {

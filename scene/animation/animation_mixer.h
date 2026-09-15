@@ -109,47 +109,6 @@ public:
 		uint32_t flags{ AI_FLAGS_DEFAULT };
 	};
 
-	struct AnimationInstanceCache {
-		LocalVector<AnimationInstance> instances;
-		LocalVector<real_t> weights_buffer;
-
-		// These are needed by AHashMap...weird
-		AnimationInstanceCache() = default;
-		AnimationInstanceCache(const AnimationInstanceCache &) = default;
-		AnimationInstanceCache& operator =(const AnimationInstanceCache &) = default;
-
-		AnimationInstanceCache(AnimationInstanceCache &&p_other) :
-			instances(std::move(p_other.instances)),
-			weights_buffer(std::move(p_other.weights_buffer)) { }
-		AnimationInstanceCache& operator =(AnimationInstanceCache &&p_other) {
-			instances = std::move(p_other.instances);
-			weights_buffer = std::move(p_other.weights_buffer);
-			return (*this);
-		}
-
-		_FORCE_INLINE_ void add(const AnimationInstance &p_ai) {
-			AnimationInstance ai = p_ai;
-			const auto track_weights_size = p_ai.track_weights.size();
-			if (track_weights_size > 0) {
-				weights_buffer.reserve(track_weights_size);
-				ai.track_weights = Span<real_t>{ weights_buffer.ptr() + weights_buffer.size(), track_weights_size };
-				for (auto w : p_ai.track_weights) {
-					weights_buffer.push_back(w);
-				}
-			}
-			instances.push_back(std::move(ai));
-		}
-
-		_FORCE_INLINE_ void clear() {
-			instances.clear();
-			weights_buffer.clear();
-		}
-
-		_FORCE_INLINE_ bool is_empty() const {
-			return instances.is_empty();
-		}
-	};
-
 protected:
 	/* ---- Data lists ---- */
 	LocalVector<AnimationLibraryData> animation_libraries;
@@ -508,7 +467,7 @@ public:
 
 	/* ---- Blending processor ---- */
 	void make_animation_instance(const StringName &p_name, const PlaybackInfo &p_playback_info, Span<real_t> p_track_weights = {}, uint32_t p_flags = AI_FLAGS_DEFAULT);
-	void make_animation_instances(const AnimationInstanceCache& p_ai_cache);
+	void make_animation_instances(Span<AnimationInstance> p_span);
 	void clear_animation_instances();
 	virtual void advance(double p_time);
 	virtual void clear_caches(); // Must be called by hand if an animation was modified after added.

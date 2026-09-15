@@ -2118,8 +2118,8 @@ void AnimationMixer::make_animation_instance(const StringName &p_name, const Pla
 	animation_instances.push_back(std::move(ai));
 }
 
-void AnimationMixer::make_animation_instances(const AnimationInstanceCache& p_ai_cache) {
-	for (const auto& ai : p_ai_cache.instances) {
+void AnimationMixer::make_animation_instances(Span<AnimationInstance> p_span) {
+	for (const auto& ai : p_span) {
 		animation_instances.push_back(ai);
 	}
 }
