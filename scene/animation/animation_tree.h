@@ -133,9 +133,29 @@ public:
 		LocalVector<real_t> weights_buffer;
 		NodeTimeInfo time_info;
 
-		NodeAnimCache() = default;
-		NodeAnimCache(const NodeAnimCache &) = default;
-		NodeAnimCache& operator =(const NodeAnimCache &) = default;
+		NodeAnimCache() { }
+
+		NodeAnimCache(const NodeAnimCache &p_other) :
+			anim_instances(p_other.anim_instances),
+			weights_buffer(p_other.weights_buffer),
+			time_info(p_other.time_info) {
+			for (auto& ai : anim_instances) {
+				const auto offset = ai.track_weights.ptr() - p_other.weights_buffer.ptr();
+				const auto size = ai.track_weights.size();
+				ai.track_weights = Span<real_t>(weights_buffer.ptr() + offset, size);
+			}
+		}
+		NodeAnimCache& operator =(const NodeAnimCache &p_other) {
+			anim_instances = p_other.anim_instances;
+			weights_buffer = p_other.weights_buffer;
+			time_info = p_other.time_info;
+			for (auto& ai : anim_instances) {
+				const auto offset = ai.track_weights.ptr() - p_other.weights_buffer.ptr();
+				const auto size = ai.track_weights.size();
+				ai.track_weights = Span<real_t>(weights_buffer.ptr() + offset, size);
+			}
+			return (*this);
+		}
 
 		NodeAnimCache(NodeAnimCache &&p_other) :
 			anim_instances(std::move(p_other.anim_instances)),
@@ -155,7 +175,7 @@ public:
 			AnimationMixer::AnimationInstance ai = p_ai;
 			const auto track_weights_size = p_ai.track_weights.size();
 			if (track_weights_size > 0) {
-				weights_buffer.reserve(track_weights_size);
+				weights_buffer.reserve(weights_buffer.size() + track_weights_size);
 				ai.track_weights = Span<real_t>{ weights_buffer.ptr() + weights_buffer.size(), track_weights_size };
 				for (auto w : p_ai.track_weights) {
 					weights_buffer.push_back(w);
@@ -172,6 +192,27 @@ public:
 
 		_FORCE_INLINE_ bool is_empty() const {
 			return anim_instances.is_empty();
+		}
+
+		_FORCE_INLINE_ void process(Span<real_t> p_track_weights, real_t p_weight = 1.0, bool p_seek = false) {
+			for (auto& ai : anim_instances) {
+				auto ai_weights_end = ai.track_weights.end();
+				auto ai_weights_ptr = const_cast<real_t*>(ai.track_weights.ptr());
+				for (auto w : p_track_weights) {
+					(*ai_weights_ptr++) *= w;
+					if (unlikely(ai_weights_ptr == ai_weights_end)) {
+						break;
+					}
+				}
+
+				ai.playback_info.weight *= p_weight;
+
+				if (p_seek) {
+					ai.playback_info.seeked = p_seek;
+					ai.playback_info.is_external_seeking = false;
+					ai.flags = AnimationMixer::AI_FLAGS_NONE;
+				}
+			}
 		}
 	};
 

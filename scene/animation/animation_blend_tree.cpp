@@ -1593,10 +1593,9 @@ String AnimationNodeLoad::get_caption() const {
 
 AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
 	const String& store_path_val = p_instance.get_parameter_store_path();
+
 	auto it = p_process_state.stores.find(store_path_val);
-	if (it) {
-		return blend_cache(p_process_state, p_instance, it->value, p_test_only);
-	} else {
+	if (!it) {
 		AnimationNodeInstance* store_path_inst = store_path_val.is_empty()
 			? nullptr
 			: p_process_state.tree->get_node_instance_by_path_or_null(Animation::PARAMETERS_BASE_PATH + store_path_val + "/");
@@ -1627,12 +1626,14 @@ AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_
 		pi.seeked = p_process_state.tree_just_started;
 		pi.weight = 1.0;
 
-		auto nti = store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, p_test_only, true);
+		auto active_caches_copy = std::move(p_process_state.active_caches);
+		store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, p_test_only, true);
+		p_process_state.active_caches = std::move(active_caches_copy);
 
-		p_process_state.stores[store_path_val] = store_path_inst;
-
-		return nti;
+		it = p_process_state.stores.insert(store_path_val, store_path_inst);
 	}
+
+	return blend_cache(p_process_state, p_instance, it->value, 1.0, false, p_test_only);
 }
 
 AnimationNodeLoad::AnimationNodeLoad() {

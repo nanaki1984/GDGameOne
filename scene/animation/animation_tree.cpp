@@ -116,6 +116,7 @@ void AnimationNode::blend_animation(ProcessState &p_process_state, AnimationNode
 	ai.flags = AnimationMixer::AI_FLAGS_DEFAULT;
 
 	for (auto cache : p_process_state.active_caches) {
+		//print_line(vformat("blend_anim %s@%f tw %f w %f", ai.animation->get_name().ptr(), ai.playback_info.time, ai.track_weights[0], ai.playback_info.weight));
 		cache->add(ai);
 	}
 }
@@ -309,20 +310,16 @@ AnimationNode::NodeTimeInfo AnimationNode::_blend_cache(ProcessState &p_process_
 		return NodeTimeInfo();
 	}
 
-	for (const auto& ai : it->value.anim_instances) {
-		AnimationMixer::AnimationInstance new_ai = ai;
+	auto cache_copy = it->value;
+	cache_copy.process(p_instance.track_weights, p_weight, p_seek);
 
-		new_ai.playback_info.weight *= p_weight;
-		if (p_seek) {
-			new_ai.playback_info.seeked = p_seek;
-			new_ai.playback_info.is_external_seeking = false;
-			new_ai.flags = AnimationMixer::AI_FLAGS_NONE;
-		}
-
+	for (const auto& ai : cache_copy.anim_instances) {
 		for (auto cache : p_process_state.active_caches) {
-			cache->add(new_ai);
+			//print_line(vformat("blend_cache %s@%f tw %f w %f", ai.animation->get_name().ptr(), ai.playback_info.time, ai.track_weights[0], ai.playback_info.weight));
+			cache->add(ai);
 		}
 	}
+
 	return it->value.time_info;
 }
 
@@ -788,6 +785,9 @@ bool AnimationTree::_blend_pre_process(double p_delta, int p_track_count, const 
 
 	auto it = process_state.anim_caches.find(&instance);
 	CRASH_COND(!it);
+	/*for (auto& ai : it->value.anim_instances) {
+		print_line(vformat("final %s@%f tw %f w %f", ai.animation->get_name().ptr(), ai.playback_info.time, ai.track_weights[0], ai.playback_info.weight));
+	}*/
 	make_animation_instances(it->value.anim_instances);
 
 	return true;
