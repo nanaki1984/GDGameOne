@@ -1592,7 +1592,12 @@ String AnimationNodeLoad::get_caption() const {
 }
 
 AnimationNode::NodeTimeInfo AnimationNodeLoad::_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
-	return blend_store(p_process_state, p_instance, p_instance.get_parameter_store_path(), 1.0, p_test_only);
+	if (p_test_only) {
+		return NodeTimeInfo();
+	}
+
+	const bool reset = p_playback_info.seeked && !p_playback_info.is_external_seeking && Math::is_zero_approx(p_playback_info.time);
+	return blend_store(p_process_state, p_instance, p_instance.get_parameter_store_path(), reset, 1.0);
 }
 
 AnimationNodeLoad::AnimationNodeLoad() {

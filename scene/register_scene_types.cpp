@@ -42,6 +42,7 @@
 #include "scene/animation/animation_mixer.h"
 #include "scene/animation/animation_node_extension.h"
 #include "scene/animation/animation_node_state_machine.h"
+#include "scene/animation/animation_node_slot.h"
 #include "scene/animation/animation_player.h"
 #include "scene/animation/animation_tree.h"
 #include "scene/animation/tween.h"
@@ -614,6 +615,8 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AnimationNodeObserverBlendSpace);
 	GDREGISTER_CLASS(AnimationNodeStateMachine);
 	GDREGISTER_CLASS(AnimationNodeStateMachinePlayback);
+	GDREGISTER_CLASS(AnimationNodeSlot);
+	GDREGISTER_CLASS(AnimationNodeSlotPlayback);
 	GDREGISTER_VIRTUAL_CLASS(AnimationNodeExtension);
 
 	GDREGISTER_CLASS(AnimationNodeSync);

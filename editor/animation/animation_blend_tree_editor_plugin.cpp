@@ -1314,6 +1314,7 @@ AnimationNodeBlendTreeEditor::AnimationNodeBlendTreeEditor() {
 	add_options.push_back(AddOption("StateMachine", "AnimationNodeStateMachine"));
 	add_options.push_back(AddOption("Store", "AnimationNodeStore", 1));
 	add_options.push_back(AddOption("Load", "AnimationNodeLoad"));
+	add_options.push_back(AddOption("Slot", "AnimationNodeSlot", 1));
 	_update_options_menu();
 	filter_dialog = memnew(AcceptDialog);
 	add_child(filter_dialog);
