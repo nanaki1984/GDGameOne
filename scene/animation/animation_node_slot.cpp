@@ -101,7 +101,7 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
         fading_pos = .0f;
         reset = true;
 
-        fading_out_slots.push_back(FadingOutSlot{ last_frame_snapshot, fading_time, fading_curve });
+        fading_out_states.push_back(FadingOutState{ last_frame_snapshot, fading_time, fading_curve });
 
         last_request.is_valid = false;
         last_request.xfade_curve.unref();
@@ -118,26 +118,26 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
 
     float p_delta = p_playback_info.delta;
 
-    for (auto& fading_out_slot : fading_out_slots) {
-        if (Animation::is_greater_or_equal_approx(fading_out_slot.fading_pos, fading_out_slot.fading_time)) {
-            fading_out_slot.should_delete = true;
+    for (auto& fading_out_state : fading_out_states) {
+        if (Animation::is_greater_or_equal_approx(fading_out_state.fading_pos, fading_out_state.fading_time)) {
+            fading_out_state.should_delete = true;
             continue;
         }
 
-        float blend = MIN(1.f, fading_out_slot.fading_pos / fading_out_slot.fading_time);
-        if (fading_out_slot.fading_curve.is_valid()) {
-            blend = CLAMP(fading_out_slot.fading_curve->sample(blend), .0f, 1.f);
+        float blend = MIN(1.f, fading_out_state.fading_pos / fading_out_state.fading_time);
+        if (fading_out_state.fading_curve.is_valid()) {
+            blend = CLAMP(fading_out_state.fading_curve->sample(blend), .0f, 1.f);
         }
         blend = 1.f - blend;
 
-        fading_out_slot.fading_pos += p_delta;
+        fading_out_state.fading_pos += p_delta;
 
-        p_slot->blend_snapshot(p_process_state, p_instance, fading_out_slot.snapshot.ptr(), blend);
+        p_slot->blend_snapshot(p_process_state, p_instance, fading_out_state.snapshot.ptr(), blend);
     }
 
-    for (int32_t i = fading_out_slots.size() - 1; i >= 0; --i) {
-        if (fading_out_slots[i].should_delete) {
-            fading_out_slots.remove_at(i);
+    for (int32_t i = fading_out_states.size() - 1; i >= 0; --i) {
+        if (fading_out_states[i].should_delete) {
+            fading_out_states.remove_at(i);
         }
     }
 
@@ -197,7 +197,7 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
         fading_pos = .0f;
         reset = !p_slot->is_using_sync();
 
-        fading_out_slots.push_back(FadingOutSlot{ last_frame_snapshot, fading_time, {} });
+        fading_out_states.push_back(FadingOutState{ last_frame_snapshot, fading_time, {} });
 
         auto previous_state = current_state;
         current_state = StringName();

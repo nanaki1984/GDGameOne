@@ -176,7 +176,19 @@ public:
 			AnimationMixer::AnimationInstance ai = p_ai;
 			const auto track_weights_size = p_ai.track_weights.size();
 			if (track_weights_size > 0) {
+				// TODO: this is starting to get too complicated (to keep the Spans valid)! I might just keep a LocalVector inside AnimationInstance and that's it!
+				auto prev_weights_buffer_ptr = weights_buffer.ptr();
 				weights_buffer.reserve(weights_buffer.size() + track_weights_size);
+				auto curr_weights_buffer_ptr = weights_buffer.ptr();
+
+				if (curr_weights_buffer_ptr != prev_weights_buffer_ptr) {
+					for (auto& ai : anim_instances) {
+						const auto offset = ai.track_weights.ptr() - prev_weights_buffer_ptr;
+						const auto size = ai.track_weights.size();
+						ai.track_weights = Span<real_t>(curr_weights_buffer_ptr + offset, size);
+					}
+				}
+
 				ai.track_weights = Span<real_t>{ weights_buffer.ptr() + weights_buffer.size(), track_weights_size };
 				for (auto w : p_ai.track_weights) {
 					weights_buffer.push_back(w);

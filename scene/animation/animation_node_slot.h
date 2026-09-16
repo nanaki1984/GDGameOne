@@ -74,15 +74,15 @@ class AnimationNodeSlotPlayback : public Resource {
     float input_xfade_time{ .25f };
     Ref<Curve> input_xfade_curve;
 
-    struct FadingOutSlot {
+    struct FadingOutState {
         Ref<AnimationSnapshot> snapshot;
         float fading_time;
         Ref<Curve> fading_curve;
         float fading_pos;
         bool should_delete;
 
-        FadingOutSlot() { }
-        FadingOutSlot(const Ref<AnimationSnapshot>& p_snapshot, float p_fading_time, const Ref<Curve> &p_fading_curve) {
+        FadingOutState() { }
+        FadingOutState(const Ref<AnimationSnapshot>& p_snapshot, float p_fading_time, const Ref<Curve> &p_fading_curve) {
             snapshot = p_snapshot->duplicate();
             fading_time = p_fading_time;
             fading_curve = p_fading_curve;
@@ -90,8 +90,8 @@ class AnimationNodeSlotPlayback : public Resource {
             should_delete = false;
         }
 
-        FadingOutSlot(const FadingOutSlot &) = delete;
-        FadingOutSlot(FadingOutSlot &&p_other) :
+        FadingOutState(const FadingOutState &) = delete;
+        FadingOutState(FadingOutState &&p_other) :
             snapshot(std::move(p_other.snapshot)),
             fading_time(p_other.fading_time),
             fading_curve(std::move(p_other.fading_curve)),
@@ -99,8 +99,8 @@ class AnimationNodeSlotPlayback : public Resource {
             should_delete(p_other.should_delete) {
         }
 
-        FadingOutSlot& operator=(const FadingOutSlot &) = delete;
-        FadingOutSlot& operator=(FadingOutSlot &&p_other) {
+        FadingOutState& operator=(const FadingOutState &) = delete;
+        FadingOutState& operator=(FadingOutState &&p_other) {
             snapshot = std::move(p_other.snapshot);
             fading_time = p_other.fading_time;
             fading_curve = std::move(p_other.fading_curve);
@@ -109,7 +109,7 @@ class AnimationNodeSlotPlayback : public Resource {
             return (*this);
         }
     };
-    LocalVector<FadingOutSlot> fading_out_slots;
+    LocalVector<FadingOutState> fading_out_states;
 
     struct Request {
         StringName store_name;

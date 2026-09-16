@@ -50,7 +50,6 @@ void AnimationNode::NodeAnimCache::update_weights(Span<real_t> p_track_weights, 
 				break;
 			}
 		}
-
 		ai.playback_info.weight *= p_pi_weight;
 	}
 }
