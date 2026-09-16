@@ -83,7 +83,7 @@ AnimationNode::NodeTimeInfo AnimationNodeSlot::_process(ProcessState &p_process_
         return blend_input(p_process_state, p_instance, 0, pi, FILTER_IGNORE, sync, true);
     }
 
-    return playback_new->_process(p_process_state, p_instance, this, p_playback_info);
+    return playback_new->_process(p_process_state, p_instance, this, p_playback_info, p_test_only);
 }
 
 String AnimationNodeSlot::get_caption() const {
@@ -94,8 +94,8 @@ AnimationNodeSlot::AnimationNodeSlot() {
     add_input("input");
 }
 
-AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeSlot* p_slot, const AnimationMixer::PlaybackInfo &p_playback_info) {
-    if (last_request.is_valid) {
+AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeSlot* p_slot, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
+    if (!p_test_only && last_request.is_valid) {
         fading_time = last_request.xfade_time;
         fading_curve = last_request.xfade_curve;
         fading_pos = .0f;
@@ -118,26 +118,28 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
 
     float p_delta = p_playback_info.delta;
 
-    for (auto& fading_out_state : fading_out_states) {
-        if (Animation::is_greater_or_equal_approx(fading_out_state.fading_pos, fading_out_state.fading_time)) {
-            fading_out_state.should_delete = true;
-            continue;
+    if (!p_test_only) {
+        for (auto& fading_out_state : fading_out_states) {
+            if (Animation::is_greater_or_equal_approx(fading_out_state.fading_pos, fading_out_state.fading_time)) {
+                fading_out_state.should_delete = true;
+                continue;
+            }
+
+            float blend = MIN(1.f, fading_out_state.fading_pos / fading_out_state.fading_time);
+            if (fading_out_state.fading_curve.is_valid()) {
+                blend = CLAMP(fading_out_state.fading_curve->sample(blend), .0f, 1.f);
+            }
+            blend = 1.f - blend;
+
+            fading_out_state.fading_pos += p_delta;
+
+            p_slot->blend_snapshot(p_process_state, p_instance, fading_out_state.snapshot.ptr(), blend);
         }
 
-        float blend = MIN(1.f, fading_out_state.fading_pos / fading_out_state.fading_time);
-        if (fading_out_state.fading_curve.is_valid()) {
-            blend = CLAMP(fading_out_state.fading_curve->sample(blend), .0f, 1.f);
-        }
-        blend = 1.f - blend;
-
-        fading_out_state.fading_pos += p_delta;
-
-        p_slot->blend_snapshot(p_process_state, p_instance, fading_out_state.snapshot.ptr(), blend);
-    }
-
-    for (int32_t i = fading_out_states.size() - 1; i >= 0; --i) {
-        if (fading_out_states[i].should_delete) {
-            fading_out_states.remove_at(i);
+        for (int32_t i = fading_out_states.size() - 1; i >= 0; --i) {
+            if (fading_out_states[i].should_delete) {
+                fading_out_states.remove_at(i);
+            }
         }
     }
 
@@ -148,22 +150,27 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
         pi.time = 0;
         pi.seeked = true;
         pi.is_external_seeking = false;
-        reset = false;
+
+        if (!p_test_only) {
+            reset = false;
+        }
     }
 
-    if (fading_time > 0) {
-        fading_pos += p_delta;
+    if (!p_test_only) {
+        if (fading_time > 0) {
+            fading_pos += p_delta;
 
-        pi.weight = MIN(1.f, fading_pos / fading_time);
-        if (fading_curve.is_valid()) {
-            pi.weight = CLAMP(fading_curve->sample(pi.weight), .0f, 1.f);
-        }
+            pi.weight = MIN(1.f, fading_pos / fading_time);
+            if (fading_curve.is_valid()) {
+                pi.weight = CLAMP(fading_curve->sample(pi.weight), .0f, 1.f);
+            }
 
-        if (Animation::is_greater_or_equal_approx(fading_pos, fading_time)) {
-            fading_time = 0;
+            if (Animation::is_greater_or_equal_approx(fading_pos, fading_time)) {
+                fading_time = 0;
+            }
+        } else {
+            pi.weight = 1.0;
         }
-    } else {
-        pi.weight = 1.0;
     }
 
     bool back_to_input = false;
@@ -171,38 +178,40 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
     AnimationNode::NodeTimeInfo nti;
 
     if (current_state.is_empty()) {
-        nti = p_slot->blend_input(p_process_state, p_instance, 0, pi, AnimationNode::FILTER_IGNORE, p_slot->is_using_sync(), false, &cache);
+        nti = p_slot->blend_input(p_process_state, p_instance, 0, pi, AnimationNode::FILTER_IGNORE, p_slot->is_using_sync(), p_test_only, &cache);
     } else {
-        if (p_slot->is_using_sync()) {
+        if (!p_test_only && p_slot->is_using_sync()) {
             AnimationMixer::PlaybackInfo sync_pi = p_playback_info;
             sync_pi.weight = 0;
             p_slot->blend_input(p_process_state, p_instance, 0, sync_pi);
         }
 
-        nti = p_slot->blend_store(p_process_state, p_instance, current_state, store_reset, pi.weight, &cache);
+        nti = p_slot->blend_store(p_process_state, p_instance, current_state, store_reset, pi.weight, p_test_only, &cache);
         if (nti.get_remain() == 0) {
             back_to_input = true;
         }
     }
 
-    if (cache) {
-        last_frame_snapshot->set_anim_cache(*cache, pi.weight);
-    } else {
-        last_frame_snapshot->clear();
-    }
+    if (!p_test_only) {
+        if (cache) {
+            last_frame_snapshot->set_anim_cache(*cache, pi.weight);
+        } else {
+            last_frame_snapshot->clear();
+        }
 
-    if (back_to_input) {
-        fading_time = input_xfade_time;
-        fading_curve = input_xfade_curve;
-        fading_pos = .0f;
-        reset = !p_slot->is_using_sync();
+        if (back_to_input) {
+            fading_time = input_xfade_time;
+            fading_curve = input_xfade_curve;
+            fading_pos = .0f;
+            reset = !p_slot->is_using_sync();
 
-        fading_out_states.push_back(FadingOutState{ last_frame_snapshot, fading_time, {} });
+            fading_out_states.push_back(FadingOutState{ last_frame_snapshot, fading_time, {} });
 
-        auto previous_state = current_state;
-        current_state = StringName();
+            auto previous_state = current_state;
+            current_state = StringName();
 
-        emit_signal(SceneStringName(state_finished), previous_state);
+            emit_signal(SceneStringName(state_finished), previous_state);
+        }
     }
 
     return nti;

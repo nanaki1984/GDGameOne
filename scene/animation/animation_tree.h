@@ -270,7 +270,7 @@ protected:
 	NodeTimeInfo blend_node(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance *p_other, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, NodeAnimCache** r_cache = nullptr);
 	NodeTimeInfo blend_input(ProcessState &p_process_state, AnimationNodeInstance &p_instance, int p_input, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, NodeAnimCache** r_cache = nullptr);
 
-	NodeTimeInfo blend_store(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName& p_store_name, bool p_reset = false, float p_weight = 1.0, NodeAnimCache** r_cache = nullptr);
+	NodeTimeInfo blend_store(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName& p_store_name, bool p_reset = false, float p_weight = 1.0, bool p_test_only = false, NodeAnimCache** r_cache = nullptr);
 	NodeTimeInfo blend_snapshot(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationSnapshot* p_snapshot, float p_weight = 1.0);
 
 	// Bind-able methods to expose for compatibility, moreover AnimationMixer::PlaybackInfo is not exposed.

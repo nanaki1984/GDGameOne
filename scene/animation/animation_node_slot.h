@@ -60,7 +60,7 @@ class AnimationNodeSlotPlayback : public Resource {
 
     friend AnimationNodeSlot;
 
-    AnimationNode::NodeTimeInfo _process(AnimationNode::ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeSlot* p_slot, const AnimationMixer::PlaybackInfo &p_playback_info);
+    AnimationNode::NodeTimeInfo _process(AnimationNode::ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeSlot* p_slot, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only = false);
 
     StringName current_state;
 

@@ -164,7 +164,7 @@ AnimationNode::NodeTimeInfo AnimationNode::_pre_process(ProcessState &p_process_
 
 	NodeTimeInfo nti = process(p_process_state, p_instance, p_playback_info, p_test_only);
 
-	if (should_cache) {
+	if (cache) { // !p_test_only && should_cache
 		const auto size = p_process_state.active_caches.size();
 		CRASH_COND(!cache || size == 0 || p_process_state.active_caches[size - 1] != cache);
 		cache->time_info = nti;
@@ -323,7 +323,23 @@ AnimationNode::NodeTimeInfo AnimationNode::_blend_node(ProcessState &p_process_s
 	return p_other.resource->_pre_process(p_process_state, p_other, p_playback_info, p_test_only, r_cache);
 }
 
-AnimationNode::NodeTimeInfo AnimationNode::blend_store(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName& p_store_name, bool p_reset, float p_weight, NodeAnimCache** r_cache) {
+AnimationNode::NodeTimeInfo AnimationNode::blend_store(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName& p_store_name, bool p_reset, float p_weight, bool p_test_only, NodeAnimCache** r_cache) {
+	if (p_test_only) {
+		AnimationNodeInstance* store_path_inst = p_store_name.is_empty()
+			? nullptr
+			: p_process_state.tree->get_node_instance_by_path_or_null(Animation::PARAMETERS_BASE_PATH + p_store_name + "/");
+		if (!store_path_inst || store_path_inst->resource.is_null() || !store_path_inst->resource->is_class("AnimationNodeStore")) {
+			return NodeTimeInfo();
+		}
+
+		AnimationMixer::PlaybackInfo pi;
+		pi.delta = p_process_state.original_delta;
+		pi.seeked = p_reset || p_process_state.tree_just_started;
+		pi.weight = p_weight;
+
+		return blend_node(p_process_state, p_instance, store_path_inst, pi, FILTER_IGNORE, true, true);
+	}
+
 	auto it = p_process_state.stores.find(p_store_name);
 	if (!it) {
 		AnimationNodeInstance* store_path_inst = p_store_name.is_empty()
