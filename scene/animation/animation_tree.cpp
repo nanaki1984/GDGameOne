@@ -40,6 +40,32 @@
 thread_local AnimationNode::ProcessState *AnimationNode::tls_process_state = nullptr;
 thread_local AnimationNodeInstance *AnimationNode::current_instance = nullptr;
 
+void AnimationNode::NodeAnimCache::update_weights(Span<real_t> p_track_weights, real_t p_pi_weight) {
+	for (auto& ai : anim_instances) {
+		auto ai_weights_end = ai.track_weights.end();
+		auto ai_weights_ptr = const_cast<real_t*>(ai.track_weights.ptr());
+		for (auto w : p_track_weights) {
+			(*ai_weights_ptr++) *= w;
+			if (unlikely(ai_weights_ptr == ai_weights_end)) {
+				break;
+			}
+		}
+
+		ai.playback_info.weight *= p_pi_weight;
+	}
+}
+
+void AnimationNode::NodeAnimCache::make_snapshot() {
+	for (auto& ai : anim_instances) {
+		ai.playback_info.delta = 0.0;
+		ai.playback_info.seeked = true;
+		ai.playback_info.is_external_seeking = false;
+		ai.flags = AnimationMixer::AI_FLAGS_NONE;
+	}
+
+	time_info.delta = 0.0;
+}
+
 void AnimationNode::get_parameter_list(LocalVector<PropertyInfo> *r_list) const {
 	Array parameters;
 
@@ -295,32 +321,87 @@ AnimationNode::NodeTimeInfo AnimationNode::_blend_node(ProcessState &p_process_s
 	return p_other.resource->_pre_process(p_process_state, p_other, p_playback_info, p_test_only, p_cache);
 }
 
-AnimationNode::NodeTimeInfo AnimationNode::blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance *p_other, float p_weight, bool p_seek, bool p_test_only) {
-	ERR_FAIL_NULL_V(p_other, NodeTimeInfo());
-	return _blend_cache(p_process_state, p_instance, *p_other, p_weight, p_seek, p_test_only);
-}
-
-AnimationNode::NodeTimeInfo AnimationNode::_blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance &p_other, float p_weight, bool p_seek, bool p_test_only) {
+AnimationNode::NodeTimeInfo AnimationNode::blend_store(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName& p_store_name, float p_weight, bool p_test_only, NodeAnimCache* r_cache) {
 	if (p_test_only) {
 		return NodeTimeInfo();
 	}
 
-	auto it = p_process_state.anim_caches.find(&p_other);
+	auto it = p_process_state.stores.find(p_store_name);
 	if (!it) {
-		return NodeTimeInfo();
+		AnimationNodeInstance* store_path_inst = p_store_name.is_empty()
+			? nullptr
+			: p_process_state.tree->get_node_instance_by_path_or_null(Animation::PARAMETERS_BASE_PATH + p_store_name + "/");
+		if (!store_path_inst || store_path_inst->resource.is_null() || !store_path_inst->resource->is_class("AnimationNodeStore")) {
+			if (p_instance.is_blended()) {
+				make_invalid(p_process_state, p_instance, vformat(RTR("Store node '%s' not found."), p_store_name));
+			}
+			return NodeTimeInfo();
+		}
+
+		// Re-entrancy test
+		if (p_process_state.anim_caches.has(store_path_inst)) {
+			if (p_instance.is_blended()) {
+				make_invalid(p_process_state, p_instance, vformat(RTR("Detected loop for Store node '%s'."), p_store_name));
+			}
+			return NodeTimeInfo();
+		}
+
+		store_path_inst->track_weights.resize(p_process_state.track_count);
+		real_t *src_blendsw = store_path_inst->track_weights.ptr();
+		for (int i = 0; i < p_process_state.track_count; i++) {
+			src_blendsw[i] = 1.0; // By default all go to 1 for the root input.
+		}
+		store_path_inst->blended = true;
+
+		AnimationMixer::PlaybackInfo pi;
+		pi.delta = p_process_state.original_delta;
+		pi.seeked = p_process_state.tree_just_started;
+		pi.weight = 1.0;
+
+		auto active_caches_copy = std::move(p_process_state.active_caches);
+		store_path_inst->resource->_pre_process(p_process_state, *store_path_inst, pi, false, true);
+		p_process_state.active_caches = std::move(active_caches_copy);
+
+		auto cache_it = p_process_state.anim_caches.find(store_path_inst);
+		CRASH_COND(!cache_it);
+		it = p_process_state.stores.insert(p_store_name, &cache_it->value);
 	}
 
-	auto cache_copy = it->value;
-	cache_copy.process(p_instance.track_weights, p_weight, p_seek);
+	auto cache_copy = *it->value;
+	cache_copy.update_weights(p_instance.track_weights, p_weight);
 
 	for (const auto& ai : cache_copy.anim_instances) {
 		for (auto cache : p_process_state.active_caches) {
-			//print_line(vformat("blend_cache %s@%f tw %f w %f", ai.animation->get_name().ptr(), ai.playback_info.time, ai.track_weights[0], ai.playback_info.weight));
+			//print_line(vformat("blend_store %s@%f tw %f w %f", ai.animation->get_name().ptr(), ai.playback_info.time, ai.track_weights[0], ai.playback_info.weight));
 			cache->add(ai);
 		}
 	}
 
-	return it->value.time_info;
+	if (r_cache) {
+		*r_cache = std::move(cache_copy);
+	}
+
+	return it->value->time_info;
+}
+
+AnimationNode::NodeTimeInfo AnimationNode::blend_snapshot(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationSnapshot* p_snapshot, float p_weight, bool p_test_only) {
+	ERR_FAIL_NULL_V(p_snapshot, NodeTimeInfo());
+
+	if (p_test_only) {
+		return NodeTimeInfo();
+	}
+
+	auto cache_copy = p_snapshot->get_anim_cache();
+	cache_copy.update_weights(p_instance.track_weights, p_weight);
+
+	for (const auto& ai : cache_copy.anim_instances) {
+		for (auto cache : p_process_state.active_caches) {
+			//print_line(vformat("blend_snapshot %s@%f tw %f w %f", ai.animation->get_name().ptr(), ai.playback_info.time, ai.track_weights[0], ai.playback_info.weight));
+			cache->add(ai);
+		}
+	}
+
+	return cache_copy.time_info;
 }
 
 String AnimationNode::get_caption() const {

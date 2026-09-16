@@ -44,6 +44,7 @@ class AnimationNodeStartState;
 class AnimationNodeEndState;
 class AnimationTree;
 struct AnimationNodeInstance;
+class AnimationSnapshot;
 
 class AnimationNodeObserver : public Resource {
 	GDCLASS(AnimationNodeObserver, Resource);
@@ -194,26 +195,8 @@ public:
 			return anim_instances.is_empty();
 		}
 
-		_FORCE_INLINE_ void process(Span<real_t> p_track_weights, real_t p_weight = 1.0, bool p_seek = false) {
-			for (auto& ai : anim_instances) {
-				auto ai_weights_end = ai.track_weights.end();
-				auto ai_weights_ptr = const_cast<real_t*>(ai.track_weights.ptr());
-				for (auto w : p_track_weights) {
-					(*ai_weights_ptr++) *= w;
-					if (unlikely(ai_weights_ptr == ai_weights_end)) {
-						break;
-					}
-				}
-
-				ai.playback_info.weight *= p_weight;
-
-				if (p_seek) {
-					ai.playback_info.seeked = p_seek;
-					ai.playback_info.is_external_seeking = false;
-					ai.flags = AnimationMixer::AI_FLAGS_NONE;
-				}
-			}
-		}
+		void update_weights(Span<real_t> p_track_weights, real_t p_pi_weight = 1.0);
+		void make_snapshot();
 	};
 
 	// Temporary state for blending process which needs to be started in the AnimationTree, pass through the AnimationNodes, and then return to the AnimationTree.
@@ -225,7 +208,7 @@ public:
 		bool valid = false;
 		mutable AHashMap<StringName, InvalidInstance> invalid_instances;
 
-		AHashMap<StringName, AnimationNodeInstance*> stores;
+		AHashMap<StringName, NodeAnimCache*> stores;
 
 		HashMap<AnimationNodeInstance*, NodeAnimCache> anim_caches; // TODO: paging allocator?
 		LocalVector<NodeAnimCache*> active_caches;
@@ -258,8 +241,6 @@ public:
 	NodeTimeInfo _blend_node(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance &p_other, AnimationMixer::PlaybackInfo p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, real_t *r_activity = nullptr, bool p_cache = false);
 	NodeTimeInfo _pre_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only = false, bool p_cache = false);
 
-	NodeTimeInfo _blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance &p_other, float p_weight = 1.0, bool p_seek = false, bool p_test_only = false);
-
 protected:
 	StringName current_length = "current_length";
 	StringName current_position = "current_position";
@@ -277,7 +258,8 @@ protected:
 	NodeTimeInfo blend_node(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance *p_other, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, bool p_cache = false);
 	NodeTimeInfo blend_input(ProcessState &p_process_state, AnimationNodeInstance &p_instance, int p_input, const AnimationMixer::PlaybackInfo &p_playback_info, FilterAction p_filter = FILTER_IGNORE, bool p_sync = true, bool p_test_only = false, bool p_cache = false);
 
-	NodeTimeInfo blend_cache(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeInstance *p_other, float p_weight = 1.0, bool p_seek = false, bool p_test_only = false);
+	NodeTimeInfo blend_store(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const StringName& p_store_name, float p_weight = 1.0, bool p_test_only = false, NodeAnimCache* r_cache = nullptr);
+	NodeTimeInfo blend_snapshot(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationSnapshot* p_snapshot, float p_weight = 1.0, bool p_test_only = false);
 
 	// Bind-able methods to expose for compatibility, moreover AnimationMixer::PlaybackInfo is not exposed.
 	void blend_animation_ex(const StringName &p_animation, double p_time, double p_delta, bool p_seeked, bool p_is_external_seeking, real_t p_blend, Animation::LoopedFlag p_looped_flag = Animation::LOOPED_FLAG_NONE);
@@ -353,6 +335,21 @@ public:
 };
 
 VARIANT_ENUM_CAST(AnimationNode::FilterAction)
+
+class AnimationSnapshot : public RefCounted {
+	GDCLASS(AnimationSnapshot, RefCounted);
+
+public:
+	_FORCE_INLINE_ const AnimationNode::NodeAnimCache& get_anim_cache() {
+		return anim_cache;
+	}
+	_FORCE_INLINE_ void set_anim_cache(AnimationNode::NodeAnimCache&& p_anim_cache) {
+		anim_cache = std::move(p_anim_cache);
+		anim_cache.make_snapshot();
+	}
+protected:
+	AnimationNode::NodeAnimCache anim_cache;
+};
 
 // Root node does not allow inputs.
 class AnimationRootNode : public AnimationNode {
@@ -454,7 +451,7 @@ struct AnimationNodeInstance {
 	We currently cannot do blend_position, due to type same name but different type */ \
 	X(4, CLOSEST, closest, Variant::INT, int) \
 	/* AnimationNodeLoad */ \
-	X(4, STORE_PATH, store_path, Variant::STRING, String)
+	X(4, STORE_PATH, store_path, Variant::STRING_NAME, StringName)
 
 	enum Slot : uint8_t {
 #define SLOT_ENUM(index, e, _member, _variant_type, _native_type) SLOT_##e = index,

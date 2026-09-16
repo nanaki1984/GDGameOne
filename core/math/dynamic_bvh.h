@@ -304,10 +304,10 @@ public:
 
 	int get_leaf_count() const;
 	int get_max_depth() const;
-	_FORCE_INLINE_ bool get_aabb(AABB& p_out_aabb) const {
+	_FORCE_INLINE_ bool get_aabb(AABB& r_aabb) const {
 		if (bvh_root) {
-			p_out_aabb.position = bvh_root->volume.min;
-			p_out_aabb.size = bvh_root->volume.max - bvh_root->volume.min;
+			r_aabb.position = bvh_root->volume.min;
+			r_aabb.size = bvh_root->volume.max - bvh_root->volume.min;
 			return true;
 		}
 		return false;

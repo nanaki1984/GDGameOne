@@ -606,6 +606,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AnimationTree);
 	GDREGISTER_CLASS(AnimationNode);
 	GDREGISTER_ABSTRACT_CLASS(AnimationNodeObserver);
+	GDREGISTER_CLASS(AnimationSnapshot);
 	GDREGISTER_CLASS(AnimationRootNode);
 	GDREGISTER_CLASS(AnimationNodeBlendTree);
 	GDREGISTER_CLASS(AnimationNodeBlendSpace1D);
