@@ -45,6 +45,7 @@ class AnimationNodeEndState;
 class AnimationTree;
 struct AnimationNodeInstance;
 class AnimationSnapshot;
+class AnimationNotifyQueue;
 
 class AnimationNodeObserver : public Resource {
 	GDCLASS(AnimationNodeObserver, Resource);
@@ -605,6 +606,7 @@ private:
 	mutable AHashMap<StringName, Pair<Variant, bool>> property_map; // Property value and read-only flag.
 	mutable AHashMap<StringName, AnimationNodeInstance> instance_map;
 	mutable AHashMap<ObjectID, HashSet<StringName>> instance_paths;
+	AnimationNotifyQueue *notify_queue;
 
 	mutable bool properties_dirty = true;
 	mutable bool validation_dirty = true;
@@ -693,6 +695,8 @@ public:
 	const AHashMap<StringName, AnimationNode::InvalidInstance> &get_invalid_instances() const;
 
 	real_t get_connection_activity(const StringName &p_path, int p_connection) const;
+
+	_FORCE_INLINE_ AnimationNotifyQueue *get_notify_queue() const { return notify_queue; }
 
 #ifdef TOOLS_ENABLED
 	String get_editor_error_message() const;

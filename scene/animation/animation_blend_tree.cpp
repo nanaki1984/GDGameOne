@@ -34,6 +34,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "scene/resources/animation.h"
+#include "animation_notify.h"
 
 void AnimationNodeAnimation::set_animation(const StringName &p_name) {
 	if (animation == p_name) {
@@ -300,6 +301,8 @@ AnimationNode::NodeTimeInfo AnimationNodeAnimation::_process(ProcessState &p_pro
 		pi.looped_flag = looped_flag;
 		blend_animation(p_process_state, p_instance, animation, pi);
 
+		_process_notify_list(p_process_state, p_instance, pi.time - pi.delta, pi.time);
+
 		p_instance.set_parameter_backward(cur_backward, p_process_state.is_testing);
 	}
 
@@ -376,6 +379,14 @@ Animation::LoopMode AnimationNodeAnimation::get_loop_mode() const {
 	return loop_mode;
 }
 
+void AnimationNodeAnimation::set_notify_list(TypedArray<Ref<AnimationNotifyBase>> p_notify_list) {
+	notify_list = p_notify_list;
+}
+
+TypedArray<Ref<AnimationNotifyBase>> AnimationNodeAnimation::get_notify_list() const {
+	return notify_list;
+}
+
 void AnimationNodeAnimation::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_animation", "name"), &AnimationNodeAnimation::set_animation);
 	ClassDB::bind_method(D_METHOD("get_animation"), &AnimationNodeAnimation::get_animation);
@@ -401,6 +412,9 @@ void AnimationNodeAnimation::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_loop_mode", "loop_mode"), &AnimationNodeAnimation::set_loop_mode);
 	ClassDB::bind_method(D_METHOD("get_loop_mode"), &AnimationNodeAnimation::get_loop_mode);
 
+	ClassDB::bind_method(D_METHOD("set_notify_list", "notify_list"), &AnimationNodeAnimation::set_notify_list);
+	ClassDB::bind_method(D_METHOD("get_notify_list"), &AnimationNodeAnimation::get_notify_list);
+
 	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "animation"), "set_animation", "get_animation");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "play_mode", PROPERTY_HINT_ENUM, "Forward,Backward"), "set_play_mode", "get_play_mode");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "advance_on_start"), "set_advance_on_start", "is_advance_on_start");
@@ -409,6 +423,7 @@ void AnimationNodeAnimation::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stretch_time_scale"), "set_stretch_time_scale", "is_stretching_time_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "start_offset", PROPERTY_HINT_RANGE, "-60,60,0.001,or_greater,or_less,hide_control,suffix:s"), "set_start_offset", "get_start_offset");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "loop_mode", PROPERTY_HINT_ENUM, "None,Linear,Ping-Pong"), "set_loop_mode", "get_loop_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "notify_list", PROPERTY_HINT_ARRAY_TYPE, "AnimationNotifyBase"), "set_notify_list", "get_notify_list");
 
 	BIND_ENUM_CONSTANT(PLAY_MODE_FORWARD);
 	BIND_ENUM_CONSTANT(PLAY_MODE_BACKWARD);
@@ -427,6 +442,59 @@ void AnimationNodeAnimation::_update_animation_cache(AnimationTree *p_tree, Anim
 
 	p_instance.cached_animation = anim;
 	p_instance.cached_animation_version = animation_version;
+}
+
+void AnimationNodeAnimation::_process_notify_list(ProcessState &p_process_state, AnimationNodeInstance &p_instance, double p_start_time, double p_end_time) {
+	// #todoalex: check for event states starting/ending (passing this instance) and only if p_process_state says it's ok to do that (e.g. for blend spaces we want notifies only from the closest point anim)
+	AnimationNotifyContext context(p_process_state, p_instance, p_start_time, p_end_time);
+	for (auto it : notify_list) {
+		auto notify = cast_to<AnimationNotifyBase>(it.get_validated_object());
+		if (!notify) {
+			continue;
+		}
+		switch (notify->get_type()) {
+			case AnimationNotifyBase::TYPE_EVENT: {
+				auto event = cast_to<AnimationNotifyEvent>(notify);
+				if (p_start_time > p_end_time) {
+					SWAP(p_start_time, p_end_time);
+				}
+				const double time = event->get_event_time(p_instance.cached_animation);
+				if (time >= p_start_time && time < p_end_time) {
+					_queue_event(p_process_state, p_instance, context, event);
+				}
+			} break;
+			case AnimationNotifyBase::TYPE_STATE: {
+				auto state = cast_to<AnimationNotifyState>(notify);
+				if (p_start_time > p_end_time) {
+					SWAP(p_start_time, p_end_time);
+				}
+				const double begin_time = state->get_state_begin_time(p_instance.cached_animation);
+				const double end_time = state->get_state_end_time(p_instance.cached_animation);
+				if (end_time >= p_start_time && begin_time < p_end_time) {
+					if (p_end_time >= end_time) {
+						_end_state(p_process_state, p_instance, context, state);
+					} else {
+						_keep_alive_state(p_process_state, p_instance, context, state);
+					}
+				}
+			} break;
+			default: {
+				CRASH_NOW();
+			} break;
+		}
+	}
+}
+
+void AnimationNodeAnimation::_queue_event(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyEvent *p_event) {
+	p_process_state.tree->get_notify_queue()->push_event(p_event, p_context);
+}
+
+void AnimationNodeAnimation::_keep_alive_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state) {
+	p_process_state.tree->get_notify_queue()->keep_alive_state(p_state, p_context);
+}
+
+void AnimationNodeAnimation::_end_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state) {
+	p_process_state.tree->get_notify_queue()->end_state(p_state, p_context);
 }
 
 AnimationNodeAnimation::AnimationNodeAnimation() {

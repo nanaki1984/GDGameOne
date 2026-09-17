@@ -36,6 +36,7 @@
 #include "core/object/class_db.h"
 #include "scene/animation/animation_blend_tree.h"
 #include "scene/animation/animation_player.h"
+#include "scene/animation/animation_notify.h"
 
 thread_local AnimationNode::ProcessState *AnimationNode::tls_process_state = nullptr;
 thread_local AnimationNodeInstance *AnimationNode::current_instance = nullptr;
@@ -882,6 +883,8 @@ bool AnimationTree::_blend_pre_process(double p_delta, int p_track_count, const 
 		make_animation_instances(cache->anim_instances);
 	}
 
+	notify_queue->flush(p_delta);
+
 	return true;
 }
 
@@ -1320,7 +1323,10 @@ void AnimationTree::_bind_methods() {
 AnimationTree::AnimationTree() {
 	deterministic = true;
 	callback_mode_discrete = ANIMATION_CALLBACK_MODE_DISCRETE_FORCE_CONTINUOUS;
+	notify_queue = memnew(AnimationNotifyQueue);
 }
 
 AnimationTree::~AnimationTree() {
+	memdelete(notify_queue);
+	notify_queue = nullptr;
 }

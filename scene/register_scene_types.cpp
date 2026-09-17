@@ -43,6 +43,7 @@
 #include "scene/animation/animation_node_extension.h"
 #include "scene/animation/animation_node_state_machine.h"
 #include "scene/animation/animation_node_slot.h"
+#include "scene/animation/animation_notify.h"
 #include "scene/animation/animation_player.h"
 #include "scene/animation/animation_tree.h"
 #include "scene/animation/tween.h"
@@ -636,6 +637,10 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AnimationNodeObserverTransition);
 	GDREGISTER_CLASS(AnimationNodeStore);
 	GDREGISTER_CLASS(AnimationNodeLoad);
+	GDREGISTER_CLASS(AnimationNotifyContextWrapper);
+	GDREGISTER_VIRTUAL_CLASS(AnimationNotifyBase);
+	GDREGISTER_CLASS(AnimationNotifyEvent);
+	GDREGISTER_CLASS(AnimationNotifyState);
 
 	GDREGISTER_CLASS(ShaderGlobalsOverride); // can be used in any shader
 

@@ -33,6 +33,11 @@
 #include "scene/animation/animation_tree.h"
 #include "scene/resources/curve.h"
 
+struct AnimationNotifyContext;
+class AnimationNotifyBase;
+class AnimationNotifyEvent;
+class AnimationNotifyState;
+
 class AnimationNodeAnimation : public AnimationRootNode {
 	GDCLASS(AnimationNodeAnimation, AnimationRootNode);
 
@@ -48,6 +53,8 @@ class AnimationNodeAnimation : public AnimationRootNode {
 	Animation::LoopMode loop_mode = Animation::LOOP_NONE;
 	bool stretch_time_scale = true;
 	double start_offset = 0.0;
+
+	TypedArray<Ref<AnimationNotifyBase>> notify_list;
 
 public:
 	enum PlayMode {
@@ -95,6 +102,9 @@ public:
 	void set_loop_mode(Animation::LoopMode p_loop_mode);
 	Animation::LoopMode get_loop_mode() const;
 
+    void set_notify_list(TypedArray<Ref<AnimationNotifyBase>> p_notify_list);
+    TypedArray<Ref<AnimationNotifyBase>> get_notify_list() const;
+
 	AnimationNodeAnimation();
 
 protected:
@@ -105,6 +115,10 @@ private:
 	PlayMode play_mode = PLAY_MODE_FORWARD;
 
 	void _update_animation_cache(AnimationTree *p_tree, AnimationNodeInstance &p_instance) const;
+	void _process_notify_list(ProcessState &p_process_state, AnimationNodeInstance &p_instance, double p_start_time, double p_end_time);
+	void _queue_event(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyEvent *p_event);
+	void _keep_alive_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state);
+	void _end_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state);
 };
 
 VARIANT_ENUM_CAST(AnimationNodeAnimation::PlayMode)
