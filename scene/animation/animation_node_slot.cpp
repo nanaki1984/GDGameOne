@@ -110,7 +110,7 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
         current_state = last_request.store_name;
 
         if (!previous_state.is_empty()) {
-            emit_signal(SceneStringName(state_finished), previous_state);
+            emit_signal(SceneStringName(state_finished), previous_state, true);
         }
 
         emit_signal(SceneStringName(state_started), current_state);
@@ -210,7 +210,7 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
             auto previous_state = current_state;
             current_state = StringName();
 
-            emit_signal(SceneStringName(state_finished), previous_state);
+            emit_signal(SceneStringName(state_finished), previous_state, false);
         }
     }
 
@@ -230,7 +230,7 @@ void AnimationNodeSlotPlayback::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "input_xfade_curve", PROPERTY_HINT_RESOURCE_TYPE, Curve::get_class_static()), "set_input_xfade_curve", "get_input_xfade_curve");
 
     ADD_SIGNAL(MethodInfo(SceneStringName(state_started), PropertyInfo(Variant::STRING_NAME, "state")));
-	ADD_SIGNAL(MethodInfo(SceneStringName(state_finished), PropertyInfo(Variant::STRING_NAME, "state")));    
+	ADD_SIGNAL(MethodInfo(SceneStringName(state_finished), PropertyInfo(Variant::STRING_NAME, "state"), PropertyInfo(Variant::BOOL, "canceled")));    
 }
 
 void AnimationNodeSlotPlayback::set_input_xfade_time(float p_secs) {

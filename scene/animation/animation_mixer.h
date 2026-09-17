@@ -81,32 +81,37 @@ public:
 		uint64_t last_update = 0;
 	};
 
+	enum PlaybackInfoFlags : uint8_t {
+		PI_FLAGS_NONE = 0,
+
+		PI_FLAGS_ROOT_MOTION = 1 << 0,
+		PI_FLAGS_METHODS = 1 << 1,
+		PI_FLAGS_AUDIO = 1 << 2,
+		PI_FLAGS_NOTIFY = 1 << 3,
+
+		PI_FLAGS_DEFAULT = PI_FLAGS_ROOT_MOTION/* | PI_FLAGS_METHODS | PI_FLAGS_AUDIO*/ | PI_FLAGS_NOTIFY
+	};
+
 	struct PlaybackInfo {
 		double time = 0.0;
 		double delta = 0.0;
 		double start = 0.0;
 		double end = 0.0;
+		real_t weight = 0.0;
+		Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
+		uint8_t flags{ PI_FLAGS_DEFAULT };
 		bool seeked = false;
 		bool is_external_seeking = false;
-		Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
-		real_t weight = 0.0;
-	};
 
-	enum AnimationInstanceFlags {
-		AI_FLAGS_NONE = 0,
-
-		AI_FLAGS_ROOT_MOTION = 1 << 0,
-		AI_FLAGS_METHODS = 1 << 1,
-		AI_FLAGS_AUDIO = 1 << 2,
-
-		AI_FLAGS_DEFAULT = AI_FLAGS_ROOT_MOTION | AI_FLAGS_METHODS | AI_FLAGS_AUDIO
+		_FORCE_INLINE_ bool has_flag(PlaybackInfoFlags p_flag) const { return p_flag == (flags & p_flag); }
+		_FORCE_INLINE_ void add_flag(PlaybackInfoFlags p_flag) { flags |= p_flag; }
+		_FORCE_INLINE_ void remove_flag(PlaybackInfoFlags p_flag) { flags &= ~p_flag; }
 	};
 
 	struct AnimationInstance {
 		Ref<Animation> animation;
 		PlaybackInfo playback_info;
 		Span<real_t> track_weights;
-		uint32_t flags{ AI_FLAGS_DEFAULT };
 	};
 
 protected:
@@ -466,7 +471,7 @@ public:
 	Vector3 get_root_motion_scale_accumulator() const;
 
 	/* ---- Blending processor ---- */
-	void make_animation_instance(const StringName &p_name, const PlaybackInfo &p_playback_info, Span<real_t> p_track_weights = {}, uint32_t p_flags = AI_FLAGS_DEFAULT);
+	void make_animation_instance(const StringName &p_name, const PlaybackInfo &p_playback_info, Span<real_t> p_track_weights = {});
 	void make_animation_instances(Span<AnimationInstance> p_span);
 	void clear_animation_instances();
 	virtual void advance(double p_time);

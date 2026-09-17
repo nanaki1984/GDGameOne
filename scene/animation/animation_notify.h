@@ -81,13 +81,20 @@ public:
 private:
     mutable AnimationNotifyContextWrapper *current_context{ nullptr };
 
+    real_t weight_threshold{ 1e-4f };
+
 public:
     AnimationNotifyBase();
     ~AnimationNotifyBase();
 
+    inline real_t get_weight_threshold() const { return weight_threshold; }
+    inline void set_weight_threshold(real_t p_weight_threshold) { weight_threshold = CLAMP(p_weight_threshold, 0.0, 1.0); }
+
     _FORCE_INLINE_ Type get_type() const { return type; }
 
 protected:
+    static void _bind_methods();
+
     _FORCE_INLINE_ AnimationNotifyContextWrapper *_get_current_context() const { return current_context; }
     void _set_current_context(const AnimationNotifyContext &p_context) const;
 

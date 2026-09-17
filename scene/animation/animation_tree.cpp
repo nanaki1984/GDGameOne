@@ -61,7 +61,7 @@ void AnimationNode::NodeAnimCache::make_snapshot(real_t p_weight) {
 		ai.playback_info.seeked = true;
 		ai.playback_info.is_external_seeking = false;
 		ai.playback_info.weight *= p_weight;
-		ai.flags = AnimationMixer::AI_FLAGS_NONE;
+		ai.playback_info.flags = AnimationMixer::PI_FLAGS_NONE;
 	}
 
 	time_info.delta = 0.0;
@@ -140,7 +140,6 @@ void AnimationNode::blend_animation(ProcessState &p_process_state, AnimationNode
 	ai.animation = animation;
 	ai.playback_info = p_playback_info;
 	ai.track_weights = p_instance.track_weights;
-	ai.flags = AnimationMixer::AI_FLAGS_DEFAULT;
 
 	for (auto cache : p_process_state.active_caches) {
 		//print_line(vformat("blend_anim %s@%f tw %f w %f", ai.animation->get_name().ptr(), ai.playback_info.time, ai.track_weights[0], ai.playback_info.weight));

@@ -301,7 +301,7 @@ AnimationNode::NodeTimeInfo AnimationNodeAnimation::_process(ProcessState &p_pro
 		pi.looped_flag = looped_flag;
 		blend_animation(p_process_state, p_instance, animation, pi);
 
-		_process_notify_list(p_process_state, p_instance, pi.time - pi.delta, pi.time);
+		_process_notify_list(p_process_state, p_instance, p_playback_info, pi.time - pi.delta, pi.time);
 
 		p_instance.set_parameter_backward(cur_backward, p_process_state.is_testing);
 	}
@@ -444,12 +444,15 @@ void AnimationNodeAnimation::_update_animation_cache(AnimationTree *p_tree, Anim
 	p_instance.cached_animation_version = animation_version;
 }
 
-void AnimationNodeAnimation::_process_notify_list(ProcessState &p_process_state, AnimationNodeInstance &p_instance, double p_start_time, double p_end_time) {
-	// #todoalex: check for event states starting/ending (passing this instance) and only if p_process_state says it's ok to do that (e.g. for blend spaces we want notifies only from the closest point anim)
+void AnimationNodeAnimation::_process_notify_list(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, double p_start_time, double p_end_time) {
+	if (!p_instance.is_blended() || !p_playback_info.has_flag(AnimationMixer::PI_FLAGS_NOTIFY)) {
+		return;
+	}
+
 	AnimationNotifyContext context(p_process_state, p_instance, p_start_time, p_end_time);
 	for (auto it : notify_list) {
 		auto notify = cast_to<AnimationNotifyBase>(it.get_validated_object());
-		if (!notify) {
+		if (!notify || p_playback_info.weight < notify->get_weight_threshold()) {
 			continue;
 		}
 		switch (notify->get_type()) {

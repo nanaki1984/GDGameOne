@@ -794,6 +794,9 @@ AnimationNode::NodeTimeInfo AnimationNodeBlendSpace2D::_process(ProcessState &p_
 		pi = p_playback_info;
 		pi.weight = weights[i];
 		pi.delta = deltas[i];
+		if (i != new_closest) {
+			pi.remove_flag(AnimationMixer::PI_FLAGS_NOTIFY);
+		}
 		AnimationNodeInstance *other_instance = p_instance.get_child_instance_by_path_or_null(get_blend_point_name(i));
 		NodeTimeInfo t = blend_node(p_process_state, p_instance, other_instance, pi, FILTER_IGNORE, true, p_test_only);
 		if (i == new_closest) {

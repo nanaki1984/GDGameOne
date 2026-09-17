@@ -115,7 +115,7 @@ private:
 	PlayMode play_mode = PLAY_MODE_FORWARD;
 
 	void _update_animation_cache(AnimationTree *p_tree, AnimationNodeInstance &p_instance) const;
-	void _process_notify_list(ProcessState &p_process_state, AnimationNodeInstance &p_instance, double p_start_time, double p_end_time);
+	void _process_notify_list(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, double p_start_time, double p_end_time);
 	void _queue_event(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyEvent *p_event);
 	void _keep_alive_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state);
 	void _end_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state);

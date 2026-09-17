@@ -58,6 +58,13 @@ AnimationNotifyBase::~AnimationNotifyBase() {
     current_context = nullptr;
 }
 
+void AnimationNotifyBase::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_weight_threshold"), &AnimationNotifyBase::get_weight_threshold);
+	ClassDB::bind_method(D_METHOD("set_weight_threshold", "weight_threshold"), &AnimationNotifyEvent::set_weight_threshold);
+
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "weight_threshold", PROPERTY_HINT_RANGE, "0,1,0.0001"), "set_weight_threshold", "get_weight_threshold");
+}
+
 void AnimationNotifyBase::_set_current_context(const AnimationNotifyContext &p_context) const {
     CRASH_COND(!current_context);
     current_context->context = p_context;
