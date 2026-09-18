@@ -463,7 +463,7 @@ void AnimationNodeAnimation::_process_notify_list(ProcessState &p_process_state,
 				}
 				const double time = event->get_event_time(p_instance.cached_animation);
 				if (time >= p_start_time && time < p_end_time) {
-					_queue_event(p_process_state, p_instance, context, event);
+					p_process_state.tree->get_notify_queue()->push_event(event, context);
 				}
 			} break;
 			case AnimationNotifyBase::TYPE_STATE: {
@@ -475,9 +475,9 @@ void AnimationNodeAnimation::_process_notify_list(ProcessState &p_process_state,
 				const double end_time = state->get_state_end_time(p_instance.cached_animation);
 				if (end_time >= p_start_time && begin_time < p_end_time) {
 					if (p_end_time >= end_time) {
-						_end_state(p_process_state, p_instance, context, state);
+						p_process_state.tree->get_notify_queue()->end_state(state, context);
 					} else {
-						_keep_alive_state(p_process_state, p_instance, context, state);
+						p_process_state.tree->get_notify_queue()->keep_alive_state(state, context);
 					}
 				}
 			} break;
@@ -486,18 +486,6 @@ void AnimationNodeAnimation::_process_notify_list(ProcessState &p_process_state,
 			} break;
 		}
 	}
-}
-
-void AnimationNodeAnimation::_queue_event(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyEvent *p_event) {
-	p_process_state.tree->get_notify_queue()->push_event(p_event, p_context);
-}
-
-void AnimationNodeAnimation::_keep_alive_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state) {
-	p_process_state.tree->get_notify_queue()->keep_alive_state(p_state, p_context);
-}
-
-void AnimationNodeAnimation::_end_state(ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNotifyContext &p_context, AnimationNotifyState *p_state) {
-	p_process_state.tree->get_notify_queue()->end_state(p_state, p_context);
 }
 
 AnimationNodeAnimation::AnimationNodeAnimation() {

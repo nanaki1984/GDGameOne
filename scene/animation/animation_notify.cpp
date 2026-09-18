@@ -102,23 +102,23 @@ double AnimationNotifyState::get_state_end_time(const Ref<Animation> &p_animatio
     return p_animation->get_marker_time(marker_end);
 }
 
-void AnimationNotifyState::notify_begin(const AnimationNotifyContext &p_context, double p_delta) const {
+void AnimationNotifyState::notify_begin(const AnimationNotifyContext &p_context, int64_t p_unique_id, double p_delta) const {
     _set_current_context(p_context);
-    GDVIRTUAL_CALL(_notify_begin, _get_current_context(), p_delta);
+    GDVIRTUAL_CALL(_notify_begin, _get_current_context(), p_unique_id, p_delta);
 }
 
-void AnimationNotifyState::notify_process(const AnimationNotifyContext &p_context, double p_delta) const {
+void AnimationNotifyState::notify_process(const AnimationNotifyContext &p_context, int64_t p_unique_id, double p_delta) const {
     _set_current_context(p_context);
-    GDVIRTUAL_CALL(_notify_process, _get_current_context(), p_delta);
+    GDVIRTUAL_CALL(_notify_process, _get_current_context(), p_unique_id, p_delta);
 }
 
-void AnimationNotifyState::notify_end(const AnimationNotifyContext &p_context, double p_delta) const {
+void AnimationNotifyState::notify_end(const AnimationNotifyContext &p_context, int64_t p_unique_id, double p_delta) const {
     _set_current_context(p_context);
-    GDVIRTUAL_CALL(_notify_end, _get_current_context(), p_delta);
+    GDVIRTUAL_CALL(_notify_end, _get_current_context(), p_unique_id, p_delta);
 }
 
-void AnimationNotifyState::notify_cancel(AnimationTree *tree, double p_delta) const {
-    GDVIRTUAL_CALL(_notify_cancel, tree, p_delta);
+void AnimationNotifyState::notify_cancel(AnimationTree *tree, int64_t p_unique_id, double p_delta) const {
+    GDVIRTUAL_CALL(_notify_cancel, tree, p_unique_id, p_delta);
 }
 
 AnimationNotifyState::AnimationNotifyState() {
@@ -137,10 +137,10 @@ void AnimationNotifyState::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "marker_begin"), "set_marker_begin", "get_marker_begin");
     ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "marker_end"), "set_marker_end", "get_marker_end");
 
-    GDVIRTUAL_BIND(_notify_begin, "context", "delta");
-    GDVIRTUAL_BIND(_notify_process, "context", "delta");
-    GDVIRTUAL_BIND(_notify_end, "context", "delta");
-    GDVIRTUAL_BIND(_notify_cancel, "tree", "delta");
+    GDVIRTUAL_BIND(_notify_begin, "context", "unique_id", "delta");
+    GDVIRTUAL_BIND(_notify_process, "context", "unique_id", "delta");
+    GDVIRTUAL_BIND(_notify_end, "context", "unique_id", "delta");
+    GDVIRTUAL_BIND(_notify_cancel, "tree", "unique_id", "delta");
 }
 
 void AnimationNotifyQueue::push_event(AnimationNotifyEvent *p_event, const AnimationNotifyContext &p_context) {
@@ -165,25 +165,36 @@ void AnimationNotifyQueue::flush(double p_delta) {
 
     for (auto &it : states_queue) {
         if (it.state.is_valid()) {
-            auto state_it = known_states.find(it.state);
-            if (!state_it) {
-                it.state->notify_begin(it.context, p_delta);
-
-                if (!it.should_end) {
-                    known_states.insert(it.state);
+            int32_t state_index = -1;
+            for (uint32_t i = 0; i < known_states.size(); ++i) {
+                if (known_states[i].state == it.state) {
+                    state_index = int32_t(i);
+                    break;
                 }
             }
 
-            it.state->notify_process(it.context, p_delta);
+            int64_t state_id;
+            if (state_index == -1) {
+                state_id = next_unique_state_id++;
+                it.state->notify_begin(it.context, state_id, p_delta);
 
-            if (it.should_end) {
-                it.state->notify_end(it.context, p_delta);
-
-                if (state_it) {
-                    known_states.remove(state_it);
+                if (!it.should_end) {
+                    known_states.push_back({ it.state, state_id });
                 }
             } else {
-                alive_states.insert(it.state);
+                state_id = known_states[state_index].id;
+            }
+
+            it.state->notify_process(it.context, state_id, p_delta);
+
+            if (it.should_end) {
+                it.state->notify_end(it.context, state_id, p_delta);
+
+                if (state_index != -1) {
+                    known_states.remove_at_unordered(state_index);
+                }
+            } else {
+                alive_states.push_back({ it.state, state_id });
             }
         }
     }
@@ -191,9 +202,10 @@ void AnimationNotifyQueue::flush(double p_delta) {
 
     for (auto &it : known_states) {
         if (!alive_states.has(it)) {
-            it->notify_cancel(tree, p_delta);
+            it.state->notify_cancel(tree, it.id, p_delta);
         }
     }
-    known_states = std::move(alive_states);
-    alive_states.clear(); // TODO: The move operator of HashSet is actually a swap...go figures...
+
+    known_states.clear();
+    SWAP(known_states, alive_states);
 }

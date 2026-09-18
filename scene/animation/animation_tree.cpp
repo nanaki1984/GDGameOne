@@ -1322,7 +1322,9 @@ void AnimationTree::_bind_methods() {
 AnimationTree::AnimationTree() {
 	deterministic = true;
 	callback_mode_discrete = ANIMATION_CALLBACK_MODE_DISCRETE_FORCE_CONTINUOUS;
+
 	notify_queue = memnew(AnimationNotifyQueue);
+	notify_queue->tree = this;
 }
 
 AnimationTree::~AnimationTree() {

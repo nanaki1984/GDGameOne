@@ -137,15 +137,15 @@ public:
     double get_state_begin_time(const Ref<Animation> &p_animation) const;
     double get_state_end_time(const Ref<Animation> &p_animation) const;
 
-    virtual void notify_begin(const AnimationNotifyContext &p_context, double p_delta) const;
-    virtual void notify_process(const AnimationNotifyContext &p_context, double p_delta) const;
-    virtual void notify_end(const AnimationNotifyContext &p_context, double p_delta) const;
-    virtual void notify_cancel(AnimationTree *tree, double p_delta) const;
+    virtual void notify_begin(const AnimationNotifyContext &p_context, int64_t p_unique_id, double p_delta) const;
+    virtual void notify_process(const AnimationNotifyContext &p_context, int64_t p_unique_id, double p_delta) const;
+    virtual void notify_end(const AnimationNotifyContext &p_context, int64_t p_unique_id, double p_delta) const;
+    virtual void notify_cancel(AnimationTree *tree, int64_t p_unique_id, double p_delta) const;
 
-    GDVIRTUAL2C(_notify_begin, AnimationNotifyContextWrapper*, double);
-    GDVIRTUAL2C(_notify_process, AnimationNotifyContextWrapper*, double);
-    GDVIRTUAL2C(_notify_end, AnimationNotifyContextWrapper*, double);
-    GDVIRTUAL2C(_notify_cancel, AnimationTree*, double);
+    GDVIRTUAL3C(_notify_begin, AnimationNotifyContextWrapper*, int64_t, double);
+    GDVIRTUAL3C(_notify_process, AnimationNotifyContextWrapper*, int64_t, double);
+    GDVIRTUAL3C(_notify_end, AnimationNotifyContextWrapper*, int64_t, double);
+    GDVIRTUAL3C(_notify_cancel, AnimationTree*, int64_t, double);
 
     AnimationNotifyState();
 
@@ -169,8 +169,18 @@ class AnimationNotifyQueue : public Object {
     };
     LocalVector<State> states_queue;
 
-    HashSet<Ref<AnimationNotifyState>> known_states;
-    HashSet<Ref<AnimationNotifyState>> alive_states;
+    struct StateIdPair {
+        Ref<AnimationNotifyState> state;
+        int64_t id;
+
+        _FORCE_INLINE_ bool operator==(const StateIdPair &p_other) const {
+            return state == p_other.state && id == p_other.id;
+        }
+    };
+    LocalVector<StateIdPair> known_states;
+    LocalVector<StateIdPair> alive_states;
+
+    int64_t next_unique_state_id{ 0 };
 
 public:
     void push_event(AnimationNotifyEvent *p_event, const AnimationNotifyContext &p_context);
