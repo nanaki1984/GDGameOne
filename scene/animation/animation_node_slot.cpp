@@ -76,13 +76,6 @@ bool AnimationNodeSlot::is_parameter_read_only(const StringName &p_parameter) co
 AnimationNode::NodeTimeInfo AnimationNodeSlot::_process(ProcessState &p_process_state, AnimationNodeInstance &p_instance, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
 	Ref<AnimationNodeSlotPlayback> playback_new = p_instance.get_parameter(playback);
 	ERR_FAIL_COND_V(playback_new.is_null(), AnimationNode::NodeTimeInfo());
-
-    if (p_test_only) {
-        AnimationMixer::PlaybackInfo pi = p_playback_info;
-        pi.weight = 1.0;
-        return blend_input(p_process_state, p_instance, 0, pi, FILTER_IGNORE, sync, true);
-    }
-
     return playback_new->_process(p_process_state, p_instance, this, p_playback_info, p_test_only);
 }
 
@@ -94,26 +87,42 @@ AnimationNodeSlot::AnimationNodeSlot() {
     add_input("input");
 }
 
-AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeSlot* p_slot, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
-    if (!p_test_only && last_request.is_valid) {
-        fading_time = last_request.xfade_time;
-        fading_curve = last_request.xfade_curve;
-        fading_pos = .0f;
-        reset = true;
+void AnimationNodeSlotPlayback::_xfade(float p_xfade_time, const Ref<Curve> &p_xfade_curve, bool p_reset, const StringName &p_next_state, bool p_canceled) {
+    fading_time = p_xfade_time;
+    fading_curve = p_xfade_curve;
+    fading_pos = .0f;
+    reset = p_reset;
 
-        fading_out_states.push_back(FadingOutState{ last_frame_snapshot, fading_time, fading_curve });
+    fading_out_states.push_back(FadingOutState{ last_frame_snapshot, fading_time, fading_curve });
 
-        last_request.is_valid = false;
-        last_request.xfade_curve.unref();
+    auto previous_state = current_state;
+    current_state = p_next_state;
 
-        auto previous_state = current_state;
-        current_state = last_request.store_name;
+    if (!previous_state.is_empty()) {
+        emit_signal(SceneStringName(state_finished), previous_state, p_canceled);
+    }
 
-        if (!previous_state.is_empty()) {
-            emit_signal(SceneStringName(state_finished), previous_state, true);
-        }
-
+    if (!current_state.is_empty()) {
         emit_signal(SceneStringName(state_started), current_state);
+    }
+}
+
+AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeSlot* p_slot, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only) {
+    if (!p_test_only) {
+        if (last_request.is_valid) {
+            auto xfade_curve = std::move(last_request.xfade_curve);
+            last_request.is_valid = false;
+
+            if (last_request.reset || current_state != last_request.store_name) {
+                _xfade(last_request.xfade_time, xfade_curve, true, last_request.store_name, true);
+            }
+        } else if (stop_requested) {
+            stop_requested = false;
+
+            if (!current_state.is_empty()) {
+                _xfade(input_xfade_time, input_xfade_curve, !p_slot->is_using_sync(), { }, true);
+            }
+        }
     }
 
     float p_delta = p_playback_info.delta;
@@ -200,17 +209,7 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
         }
 
         if (back_to_input) {
-            fading_time = input_xfade_time;
-            fading_curve = input_xfade_curve;
-            fading_pos = .0f;
-            reset = !p_slot->is_using_sync();
-
-            fading_out_states.push_back(FadingOutState{ last_frame_snapshot, fading_time, {} });
-
-            auto previous_state = current_state;
-            current_state = StringName();
-
-            emit_signal(SceneStringName(state_finished), previous_state, false);
+            _xfade(input_xfade_time, input_xfade_curve, !p_slot->is_using_sync(), { });
         }
     }
 
@@ -224,7 +223,8 @@ void AnimationNodeSlotPlayback::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_input_xfade_curve", "curve"), &AnimationNodeSlotPlayback::set_input_xfade_curve);
 	ClassDB::bind_method(D_METHOD("get_input_xfade_curve"), &AnimationNodeSlotPlayback::get_input_xfade_curve);
 
-    ClassDB::bind_method(D_METHOD("play", "store_name", "xfade_time", "xfade_curve"), &AnimationNodeSlotPlayback::play);
+    ClassDB::bind_method(D_METHOD("play", "store_name", "xfade_time", "xfade_curve", "reset"), &AnimationNodeSlotPlayback::play, DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("stop"), &AnimationNodeSlotPlayback::stop);
 
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "input_xfade_time", PROPERTY_HINT_RANGE, "0,240,0.01,suffix:s"), "set_input_xfade_time", "get_input_xfade_time");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "input_xfade_curve", PROPERTY_HINT_RESOURCE_TYPE, Curve::get_class_static()), "set_input_xfade_curve", "get_input_xfade_curve");
@@ -251,12 +251,24 @@ Ref<Curve> AnimationNodeSlotPlayback::get_input_xfade_curve() const {
     return input_xfade_curve;
 }
 
-void AnimationNodeSlotPlayback::play(const StringName &p_store_name, float p_xfade_time, const Ref<Curve> &p_xfade_curve) {
+void AnimationNodeSlotPlayback::play(const StringName &p_store_name, float p_xfade_time, const Ref<Curve> &p_xfade_curve, bool p_reset) {
     if (!p_store_name.is_empty()) {
         last_request.store_name = p_store_name;
         last_request.xfade_time = MAX(.0f, p_xfade_time);
         last_request.xfade_curve = p_xfade_curve;
+        last_request.reset = p_reset;
         last_request.is_valid = true;
+
+        stop_requested = false;
+    }
+}
+
+void AnimationNodeSlotPlayback::stop() {
+    if (last_request.is_valid) {
+        last_request.xfade_curve.unref();
+        last_request.is_valid = false;
+    } else {
+        stop_requested = true;
     }
 }
 

@@ -60,6 +60,7 @@ class AnimationNodeSlotPlayback : public Resource {
 
     friend AnimationNodeSlot;
 
+    void _xfade(float p_xfade_time, const Ref<Curve> &p_xfade_curve, bool p_reset, const StringName &p_next_state, bool p_canceled = false);
     AnimationNode::NodeTimeInfo _process(AnimationNode::ProcessState &p_process_state, AnimationNodeInstance &p_instance, AnimationNodeSlot* p_slot, const AnimationMixer::PlaybackInfo &p_playback_info, bool p_test_only = false);
 
     StringName current_state;
@@ -115,8 +116,10 @@ class AnimationNodeSlotPlayback : public Resource {
         StringName store_name;
         float xfade_time;
         Ref<Curve> xfade_curve;
+        bool reset;
         bool is_valid{ false };
     } last_request;
+    bool stop_requested{ false };
 
 protected:
 	static void _bind_methods();
@@ -128,7 +131,8 @@ public:
     void set_input_xfade_curve(const Ref<Curve> &p_curve);
 	Ref<Curve> get_input_xfade_curve() const;
 
-    void play(const StringName &p_store_name, float p_xfade_time, const Ref<Curve> &p_xfade_curve);
+    void play(const StringName &p_store_name, float p_xfade_time, const Ref<Curve> &p_xfade_curve, bool p_reset = true);
+    void stop();
 
     AnimationNodeSlotPlayback();
 };
