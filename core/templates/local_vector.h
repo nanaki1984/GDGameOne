@@ -78,7 +78,7 @@ private:
 
 	// Can't use `_resize(0)`, since it requires a no-arg-constructor even if it wouldn't be called.
 	void _clear() {
-		if constexpr (!std::is_trivially_destructible_v<T>) {
+		if constexpr (!force_trivial && !std::is_trivially_destructible_v<T>) {
 			for (U i = 0; i < count; i++) {
 				data[i].~T();
 			}
