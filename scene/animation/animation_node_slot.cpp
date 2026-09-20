@@ -99,11 +99,11 @@ void AnimationNodeSlotPlayback::_xfade(float p_xfade_time, const Ref<Curve> &p_x
     current_state = p_next_state;
 
     if (!previous_state.is_empty()) {
-        emit_signal(SceneStringName(state_finished), previous_state, p_canceled);
+        emit_signal(SceneStringName(state_finished), this, previous_state, p_canceled);
     }
 
     if (!current_state.is_empty()) {
-        emit_signal(SceneStringName(state_started), current_state);
+        emit_signal(SceneStringName(state_started), this, current_state);
     }
 }
 
@@ -175,6 +175,7 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
             }
 
             if (Animation::is_greater_or_equal_approx(fading_pos, fading_time)) {
+                fading_curve.unref();
                 fading_time = 0;
             }
         } else {
@@ -229,8 +230,8 @@ void AnimationNodeSlotPlayback::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "input_xfade_time", PROPERTY_HINT_RANGE, "0,240,0.01,suffix:s"), "set_input_xfade_time", "get_input_xfade_time");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "input_xfade_curve", PROPERTY_HINT_RESOURCE_TYPE, Curve::get_class_static()), "set_input_xfade_curve", "get_input_xfade_curve");
 
-    ADD_SIGNAL(MethodInfo(SceneStringName(state_started), PropertyInfo(Variant::STRING_NAME, "state")));
-	ADD_SIGNAL(MethodInfo(SceneStringName(state_finished), PropertyInfo(Variant::STRING_NAME, "state"), PropertyInfo(Variant::BOOL, "canceled")));    
+    ADD_SIGNAL(MethodInfo(SceneStringName(state_started), PropertyInfo(Variant::OBJECT, "playback"), PropertyInfo(Variant::STRING_NAME, "state")));
+	ADD_SIGNAL(MethodInfo(SceneStringName(state_finished), PropertyInfo(Variant::OBJECT, "playback"), PropertyInfo(Variant::STRING_NAME, "state"), PropertyInfo(Variant::BOOL, "canceled")));    
 }
 
 void AnimationNodeSlotPlayback::set_input_xfade_time(float p_secs) {

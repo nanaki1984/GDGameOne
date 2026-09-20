@@ -134,5 +134,8 @@ public:
     void play(const StringName &p_store_name, float p_xfade_time, const Ref<Curve> &p_xfade_curve, bool p_reset = true);
     void stop();
 
+    _FORCE_INLINE_ bool is_current_state(StringName p_store_name) const { return current_state == p_store_name; }
+    _FORCE_INLINE_ bool is_next_state(StringName p_store_name) const { return last_request.is_valid && last_request.store_name == p_store_name; }
+
     AnimationNodeSlotPlayback();
 };
