@@ -165,22 +165,20 @@ AnimationNode::NodeTimeInfo AnimationNodeSlotPlayback::_process(AnimationNode::P
         }
     }
 
-    if (!p_test_only) {
-        if (fading_time > 0) {
-            fading_pos += p_delta;
+    if (!p_test_only && fading_time > .0f) {
+        fading_pos += p_delta;
 
-            pi.weight = MIN(1.f, fading_pos / fading_time);
-            if (fading_curve.is_valid()) {
-                pi.weight = CLAMP(fading_curve->sample(pi.weight), .0f, 1.f);
-            }
-
-            if (Animation::is_greater_or_equal_approx(fading_pos, fading_time)) {
-                fading_curve.unref();
-                fading_time = 0;
-            }
-        } else {
-            pi.weight = 1.0;
+        pi.weight = MIN(1.f, fading_pos / fading_time);
+        if (fading_curve.is_valid()) {
+            pi.weight = CLAMP(fading_curve->sample(pi.weight), .0f, 1.f);
         }
+
+        if (Animation::is_greater_or_equal_approx(fading_pos, fading_time)) {
+            fading_curve.unref();
+            fading_time = .0f;
+        }
+    } else {
+        pi.weight = 1.0;
     }
 
     bool back_to_input = false;

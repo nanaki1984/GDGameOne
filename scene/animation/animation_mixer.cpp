@@ -2121,7 +2121,7 @@ void AnimationMixer::make_animation_instance(const StringName &p_name, const Pla
 }
 
 void AnimationMixer::make_animation_instances(Span<AnimationInstance> p_span) {
-	for (const auto& ai : p_span) {
+	for (const auto &ai : p_span) {
 		animation_instances.push_back(ai);
 	}
 }

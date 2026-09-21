@@ -65,7 +65,7 @@ class AnimationNodeSlotPlayback : public Resource {
 
     StringName current_state;
 
-    float fading_time;
+    float fading_time{ .0f };
     Ref<Curve> fading_curve;
     float fading_pos;
     bool reset{ true };
