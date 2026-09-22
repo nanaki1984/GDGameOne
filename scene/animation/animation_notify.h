@@ -63,6 +63,8 @@ public:
     inline double get_previous_time() const { return context.previous_time; }
     inline double get_current_time() const { return context.current_time; }
 
+    Node *get_tree_root_node() const;
+
 protected:
     static void _bind_methods();
 };

@@ -41,12 +41,19 @@ AnimationNotifyContext::AnimationNotifyContext(AnimationNode::ProcessState &p_pr
     current_time = p_end_time;
 }
 
+Node *AnimationNotifyContextWrapper::get_tree_root_node() const {
+    ERR_FAIL_NULL_V(context.tree, nullptr);
+    return context.tree->get_node_or_null(context.tree->get_root_node());
+}
+
 void AnimationNotifyContextWrapper::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tree"), &AnimationNotifyContextWrapper::get_tree);
 	ClassDB::bind_method(D_METHOD("get_path"), &AnimationNotifyContextWrapper::get_path);
 	ClassDB::bind_method(D_METHOD("get_animation"), &AnimationNotifyContextWrapper::get_animation);
 	ClassDB::bind_method(D_METHOD("get_previous_time"), &AnimationNotifyContextWrapper::get_previous_time);
 	ClassDB::bind_method(D_METHOD("get_current_time"), &AnimationNotifyContextWrapper::get_current_time);
+
+    ClassDB::bind_method(D_METHOD("get_tree_root_node"), &AnimationNotifyContextWrapper::get_tree_root_node);
 }
 
 AnimationNotifyBase::AnimationNotifyBase() {
