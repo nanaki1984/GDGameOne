@@ -3944,6 +3944,17 @@ Viewport::DebugDraw Viewport::get_debug_draw() const {
 	return debug_draw;
 }
 
+void Viewport::set_render_path(RenderPath p_render_path) {
+	ERR_MAIN_THREAD_GUARD;
+	render_path = p_render_path;
+	RS::get_singleton()->viewport_set_render_path(viewport, RSE::ViewportRenderPath(p_render_path));
+}
+
+Viewport::RenderPath Viewport::get_render_path() const {
+	ERR_READ_THREAD_GUARD_V(RENDER_PATH_DEFAULT);
+	return render_path;
+}
+
 int Viewport::get_render_info(RenderInfoType p_type, RenderInfo p_info) {
 	ERR_READ_THREAD_GUARD_V(0);
 	return RS::get_singleton()->viewport_get_render_info(viewport, RSE::ViewportRenderInfoType(p_type), RSE::ViewportRenderInfo(p_info));
@@ -5235,6 +5246,9 @@ void Viewport::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_debug_draw", "debug_draw"), &Viewport::set_debug_draw);
 	ClassDB::bind_method(D_METHOD("get_debug_draw"), &Viewport::get_debug_draw);
 
+	ClassDB::bind_method(D_METHOD("set_render_path", "render_path"), &Viewport::set_render_path);
+	ClassDB::bind_method(D_METHOD("get_render_path"), &Viewport::get_render_path);
+
 	ClassDB::bind_method(D_METHOD("set_use_oversampling", "enable"), &Viewport::set_use_oversampling);
 	ClassDB::bind_method(D_METHOD("is_using_oversampling"), &Viewport::is_using_oversampling);
 
@@ -5414,6 +5428,7 @@ void Viewport::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_occlusion_culling"), "set_use_occlusion_culling", "is_using_occlusion_culling");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mesh_lod_threshold", PROPERTY_HINT_RANGE, "0,1024,0.1"), "set_mesh_lod_threshold", "get_mesh_lod_threshold");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "debug_draw", PROPERTY_HINT_ENUM, "Disabled,Unshaded,Lighting,Overdraw,Wireframe,Normal Buffer,VoxelGI Albedo,VoxelGI Lighting,VoxelGI Emission,Shadow Atlas,Directional Shadow Map,Scene Luminance,SSAO,SSIL,Directional Shadow Splits,Decal Atlas,SDFGI Cascades,SDFGI Probes,VoxelGI/SDFGI Buffer,Disable Mesh LOD,OmniLight3D Cluster,SpotLight3D Cluster,Decal Cluster,ReflectionProbe Cluster,Occlusion Culling Buffer,Motion Vectors,Internal Buffer,AreaLight3D Cluster,AreaLight3D Atlas"), "set_debug_draw", "get_debug_draw");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "render_path", PROPERTY_HINT_ENUM, "Default,ShadowMap,Paraboloid ShadowMap"), "set_render_path", "get_render_path");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_hdr_2d"), "set_use_hdr_2d", "is_using_hdr_2d");
 
 #ifndef _3D_DISABLED

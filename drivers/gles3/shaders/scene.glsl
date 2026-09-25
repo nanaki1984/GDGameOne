@@ -44,6 +44,8 @@ LIGHTMAP_BICUBIC_FILTER = false
 RENDER_MOTION_VECTORS = false
 USE_LIGHTMAP_SPECULAR = false
 
+CUSTOM_SM = false
+CUSTOM_PSM = false
 
 #[vertex]
 
@@ -58,7 +60,7 @@ USE_LIGHTMAP_SPECULAR = false
 #define OUTPUT_IS_MULTIVIEW false
 #endif
 
-#if defined(RENDER_SHADOWS) || defined(RENDER_SHADOWS_LINEAR)
+#if defined(RENDER_SHADOWS) || defined(RENDER_SHADOWS_LINEAR) || defined(CUSTOM_SM) || defined(CUSTOM_PSM)
 #define IN_SHADOW_PASS true
 #else
 #define IN_SHADOW_PASS false
@@ -838,6 +840,13 @@ void vertex_shader(vec4 vertex_angle_attrib_input,
 
 #if defined(OVERRIDE_POSITION)
 	clip_position_output = position;
+#elif defined(CUSTOM_PSM)
+    float light_dist = length(vertex_interp);
+    vec3 p = vertex_interp / light_dist;
+    clip_position_output.x =  p.x / (1.0 - p.z);
+    clip_position_output.y = -p.y / (1.0 - p.z);
+    clip_position_output.z = (scene_data_block.data.z_far - light_dist) / scene_data_block.data.z_far;
+    clip_position_output.w = 1.0;
 #else
 	clip_position_output = projection_matrix * vec4(vertex_interp, 1.0);
 #endif
@@ -1074,7 +1083,7 @@ void main() {
 #define OUTPUT_IS_MULTIVIEW false
 #endif
 
-#if defined(RENDER_SHADOWS) || defined(RENDER_SHADOWS_LINEAR)
+#if defined(RENDER_SHADOWS) || defined(RENDER_SHADOWS_LINEAR) || defined(CUSTOM_SM) || defined(CUSTOM_PSM)
 #define IN_SHADOW_PASS true
 #else
 #define IN_SHADOW_PASS false
@@ -2949,7 +2958,19 @@ void main() {
 	gl_FragDepth = (scene_data_block.data.z_far - (length(vertex) + scene_data_block.data.shadow_bias)) / scene_data_block.data.z_far;
 #endif
 
+#if defined(CUSTOM_SM) || defined(CUSTOM_PSM)
+	float frag_depth = gl_FragCoord.z;
+#	ifdef CUSTOM_PSM
+	if (vertex.z > 0.0) {
+		discard;
+	}
+	gl_FragDepth = frag_depth = (scene_data_block.data.z_far - length(vertex)) / scene_data_block.data.z_far;
+#	endif // CUSTOM_PSM
+    frag_color = vec4(frag_depth, 0.0, 0.0, 1.0);
+#endif // CUSTOM_SM || CUSTOMPSM
+
 // Nothing happens, so a tree-ssa optimizer will result in no fragment shader :)
+
 #else // !MODE_RENDER_DEPTH
 
 #ifdef RENDER_MATERIAL

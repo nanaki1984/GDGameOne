@@ -459,6 +459,8 @@ struct RenderTarget {
 
 	RID texture;
 
+	RSE::ViewportRenderPath render_path = RSE::VIEWPORT_RENDER_PATH_DEFAULT;
+
 	Color clear_color = Color(1, 1, 1, 1);
 	bool clear_requested = false;
 
@@ -872,6 +874,9 @@ public:
 	virtual bool render_target_is_using_hdr(RID p_render_target) const override;
 	virtual void render_target_set_use_debanding(RID p_render_target, bool p_use_debanding) override {}
 	virtual bool render_target_is_using_debanding(RID p_render_target) const override { return false; }
+
+	virtual void render_target_set_render_path(RID p_render_target, RSE::ViewportRenderPath p_render_path) override;
+	virtual RSE::ViewportRenderPath render_target_get_render_path(RID p_render_target) const override;
 
 	// new
 	void render_target_set_as_unused(RID p_render_target) override {

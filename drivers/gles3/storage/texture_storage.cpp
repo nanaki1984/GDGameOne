@@ -3270,24 +3270,36 @@ void TextureStorage::_update_render_target_color(RenderTarget *rt) {
 
 	Config *config = Config::get_singleton();
 
-	if (rt->hdr) {
-		rt->color_internal_format = GL_RGBA16F;
-		rt->color_format = GL_RGBA;
-		rt->color_type = GL_FLOAT;
-		rt->color_format_size = 8;
-		rt->image_format = Image::FORMAT_RGBAF;
-	} else if (rt->is_transparent) {
-		rt->color_internal_format = GL_RGBA8;
-		rt->color_format = GL_RGBA;
-		rt->color_type = GL_UNSIGNED_BYTE;
-		rt->color_format_size = 4;
-		rt->image_format = Image::FORMAT_RGBA8;
-	} else {
-		rt->color_internal_format = GL_RGB10_A2;
-		rt->color_format = GL_RGBA;
-		rt->color_type = GL_UNSIGNED_INT_2_10_10_10_REV;
-		rt->color_format_size = 4;
-		rt->image_format = Image::FORMAT_RGBA8;
+	switch (rt->render_path) {
+		case RSE::VIEWPORT_RENDER_PATH_DEFAULT: {
+			if (rt->hdr) {
+				rt->color_internal_format = GL_RGBA16F;
+				rt->color_format = GL_RGBA;
+				rt->color_type = GL_FLOAT;
+				rt->color_format_size = 8;
+				rt->image_format = Image::FORMAT_RGBAF;
+			} else if (rt->is_transparent) {
+				rt->color_internal_format = GL_RGBA8;
+				rt->color_format = GL_RGBA;
+				rt->color_type = GL_UNSIGNED_BYTE;
+				rt->color_format_size = 4;
+				rt->image_format = Image::FORMAT_RGBA8;
+			} else {
+				rt->color_internal_format = GL_RGB10_A2;
+				rt->color_format = GL_RGBA;
+				rt->color_type = GL_UNSIGNED_INT_2_10_10_10_REV;
+				rt->color_format_size = 4;
+				rt->image_format = Image::FORMAT_RGBA8;
+			}
+		} break;
+		case RSE::VIEWPORT_RENDER_PATH_SM:
+		case RSE::VIEWPORT_RENDER_PATH_PSM: {
+			rt->color_internal_format = GL_R16F;
+			rt->color_format = GL_RED;//GL_RGBA;
+			rt->color_type = GL_HALF_FLOAT;//GL_FLOAT;
+			rt->color_format_size = 2;
+			rt->image_format = Image::FORMAT_RH;//Image::FORMAT_RF;
+		} break;
 	}
 
 	glDisable(GL_SCISSOR_TEST);
@@ -3966,6 +3978,28 @@ bool TextureStorage::render_target_is_using_hdr(RID p_render_target) const {
 	ERR_FAIL_NULL_V(rt, false);
 
 	return rt->hdr;
+}
+
+void TextureStorage::render_target_set_render_path(RID p_render_target, RSE::ViewportRenderPath p_render_path) {
+	RenderTarget *rt = render_target_owner.get_or_null(p_render_target);
+	ERR_FAIL_NULL(rt);
+	ERR_FAIL_COND(rt->direct_to_screen);
+	if (p_render_path == rt->render_path) {
+		return;
+	}
+
+	if (rt->overridden.color.is_null()) {
+		_clear_render_target(rt);
+		rt->render_path = p_render_path;
+		_update_render_target_color(rt);
+	}
+}
+
+RSE::ViewportRenderPath TextureStorage::render_target_get_render_path(RID p_render_target) const {
+	RenderTarget *rt = render_target_owner.get_or_null(p_render_target);
+	ERR_FAIL_NULL_V(rt, RSE::VIEWPORT_RENDER_PATH_DEFAULT);
+
+	return rt->render_path;
 }
 
 GLuint TextureStorage::render_target_get_color_internal_format(RID p_render_target) const {

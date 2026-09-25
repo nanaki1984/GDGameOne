@@ -4904,6 +4904,14 @@ bool TextureStorage::render_target_is_using_debanding(RID p_render_target) const
 	return rt->use_debanding;
 }
 
+void TextureStorage::render_target_set_render_path(RID p_render_target, RSE::ViewportRenderPath p_render_path) {
+	ERR_FAIL();
+}
+
+RSE::ViewportRenderPath TextureStorage::render_target_get_render_path(RID p_render_target) const {
+	ERR_FAIL_V(RSE::VIEWPORT_RENDER_PATH_DEFAULT);
+}
+
 RID TextureStorage::render_target_get_rd_framebuffer(RID p_render_target) {
 	RenderTarget *rt = render_target_owner.get_or_null(p_render_target);
 	ERR_FAIL_NULL_V(rt, RID());

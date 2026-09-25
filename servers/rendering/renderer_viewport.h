@@ -110,6 +110,8 @@ public:
 
 		RSE::ViewportDebugDraw debug_draw = RSE::VIEWPORT_DEBUG_DRAW_DISABLED;
 
+		RSE::ViewportRenderPath render_path = RSE::VIEWPORT_RENDER_PATH_DEFAULT;
+
 		RSE::ViewportClearMode clear_mode = RSE::VIEWPORT_CLEAR_ALWAYS;
 
 		RSE::CanvasItemTextureFilter texture_filter = RSE::CANVAS_ITEM_TEXTURE_FILTER_LINEAR;
@@ -288,6 +290,9 @@ public:
 
 	virtual int viewport_get_render_info(RID p_viewport, RSE::ViewportRenderInfoType p_type, RSE::ViewportRenderInfo p_info);
 	virtual void viewport_set_debug_draw(RID p_viewport, RSE::ViewportDebugDraw p_draw);
+
+	void viewport_set_render_path(RID p_viewport, RSE::ViewportRenderPath p_render_path);
+	RSE::ViewportRenderPath viewport_get_render_path(RID p_viewport) const;
 
 	void viewport_set_measure_render_time(RID p_viewport, bool p_enable);
 	float viewport_get_measured_render_time_cpu(RID p_viewport) const;

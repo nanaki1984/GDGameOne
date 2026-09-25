@@ -1573,6 +1573,25 @@ void RendererViewport::viewport_set_debug_draw(RID p_viewport, RSE::ViewportDebu
 	}
 }
 
+void RendererViewport::viewport_set_render_path(RID p_viewport, RSE::ViewportRenderPath p_render_path) {
+	Viewport *viewport = viewport_owner.get_or_null(p_viewport);
+	ERR_FAIL_NULL(viewport);
+
+	if (viewport->render_path == p_render_path) {
+		return;
+	}
+	viewport->render_path = p_render_path;
+	RSG::texture_storage->render_target_set_render_path(viewport->render_target, p_render_path);
+	_configure_3d_render_buffers(viewport);
+}
+
+RSE::ViewportRenderPath RendererViewport::viewport_get_render_path(RID p_viewport) const {
+	Viewport *viewport = viewport_owner.get_or_null(p_viewport);
+	ERR_FAIL_NULL_V(viewport, RSE::VIEWPORT_RENDER_PATH_DEFAULT);
+
+	return viewport->render_path;
+}
+
 void RendererViewport::viewport_set_measure_render_time(RID p_viewport, bool p_enable) {
 	Viewport *viewport = viewport_owner.get_or_null(p_viewport);
 	ERR_FAIL_NULL(viewport);

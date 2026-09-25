@@ -191,6 +191,12 @@ public:
 		DEBUG_DRAW_AREA_LIGHT_ATLAS,
 	};
 
+	enum RenderPath {
+		RENDER_PATH_DEFAULT,
+		RENDER_PATH_SM,
+		RENDER_PATH_PSM,
+	};
+
 	enum DefaultCanvasItemTextureFilter {
 		DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST,
 		DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR,
@@ -312,6 +318,8 @@ private:
 	RID texture_rid;
 
 	DebugDraw debug_draw = DEBUG_DRAW_DISABLED;
+
+	RenderPath render_path = RENDER_PATH_DEFAULT;
 
 	int positional_shadow_atlas_size = 2048;
 	bool positional_shadow_atlas_16_bits = true;
@@ -675,6 +683,9 @@ public:
 	void set_debug_draw(DebugDraw p_debug_draw);
 	DebugDraw get_debug_draw() const;
 
+	void set_render_path(RenderPath p_render_path);
+	RenderPath get_render_path() const;
+
 	int get_render_info(RenderInfoType p_type, RenderInfo p_info);
 
 	void set_snap_controls_to_pixels(bool p_enable);
@@ -969,6 +980,7 @@ VARIANT_ENUM_CAST(Viewport::MSAA);
 VARIANT_ENUM_CAST(Viewport::AnisotropicFiltering);
 VARIANT_ENUM_CAST(Viewport::ScreenSpaceAA);
 VARIANT_ENUM_CAST(Viewport::DebugDraw);
+VARIANT_ENUM_CAST(Viewport::RenderPath);
 VARIANT_ENUM_CAST(Viewport::SDFScale);
 VARIANT_ENUM_CAST(Viewport::SDFOversize);
 VARIANT_ENUM_CAST(Viewport::VRSMode);

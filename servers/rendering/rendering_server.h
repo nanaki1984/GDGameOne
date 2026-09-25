@@ -624,6 +624,9 @@ public:
 
 	virtual void viewport_set_debug_draw(RID p_viewport, RSE::ViewportDebugDraw p_draw) = 0;
 
+	virtual void viewport_set_render_path(RID p_viewport, RSE::ViewportRenderPath p_render_path) = 0;
+	virtual RSE::ViewportRenderPath viewport_get_render_path(RID p_viewport) const = 0;
+
 	virtual void viewport_set_measure_render_time(RID p_viewport, bool p_enable) = 0;
 	virtual double viewport_get_measured_render_time_cpu(RID p_viewport) const = 0;
 	virtual double viewport_get_measured_render_time_gpu(RID p_viewport) const = 0;
