@@ -729,6 +729,7 @@ public:
 	FUNC2(camera_set_camera_attributes, RID, RID)
 	FUNC2(camera_set_compositor, RID, RID)
 	FUNC2(camera_set_use_vertical_aspect, RID, bool)
+	FUNC2(camera_set_custom_culling_planes, RID, TypedArray<Plane>)
 
 	/* OCCLUDER */
 	FUNCRIDSPLIT(occluder)

@@ -178,6 +178,16 @@ void RendererSceneCull::camera_set_use_vertical_aspect(RID p_camera, bool p_enab
 	camera->vaspect = p_enable;
 }
 
+void RendererSceneCull::camera_set_custom_culling_planes(RID p_camera, TypedArray<Plane> p_planes) {
+	Camera *camera = camera_owner.get_or_null(p_camera);
+	ERR_FAIL_NULL(camera);
+
+	camera->custom_culling_planes.resize(p_planes.size());
+	for (int i = 0; i < p_planes.size(); ++i) {
+		camera->custom_culling_planes[i] = p_planes[i];
+	}
+}
+
 bool RendererSceneCull::is_camera(RID p_camera) const {
 	return camera_owner.owns(p_camera);
 }
@@ -1336,6 +1346,30 @@ void RendererSceneCull::instance_geometry_set_flag(RID p_instance, RSE::Instance
 				}
 			}
 		} break;
+		case RSE::INSTANCE_FLAG_IGNORE_FRUSTUM_CULLING: {
+			instance->ignore_frustum_culling = p_enabled;
+
+			if (instance->scenario && instance->array_index >= 0) {
+				InstanceData &idata = instance->scenario->instance_data[instance->array_index];
+				if (instance->ignore_frustum_culling) {
+					idata.flags |= InstanceData::FLAG_IGNORE_FRUSTUM_CULLING;
+				} else {
+					idata.flags &= ~InstanceData::FLAG_IGNORE_FRUSTUM_CULLING;
+				}
+			}
+		} break;
+		case RSE::INSTANCE_FLAG_IGNORE_CUSTOM_CULLING: {
+			instance->ignore_custom_culling = p_enabled;
+
+			if (instance->scenario && instance->array_index >= 0) {
+				InstanceData &idata = instance->scenario->instance_data[instance->array_index];
+				if (instance->ignore_custom_culling) {
+					idata.flags |= InstanceData::FLAG_IGNORE_CUSTOM_CULLING;
+				} else {
+					idata.flags &= ~InstanceData::FLAG_IGNORE_CUSTOM_CULLING;
+				}
+			}
+		} break;
 		default: {
 		}
 	}
@@ -1862,6 +1896,12 @@ void RendererSceneCull::_update_instance(Instance *p_instance) const {
 		}
 		if (p_instance->ignore_occlusion_culling) {
 			idata.flags |= InstanceData::FLAG_IGNORE_OCCLUSION_CULLING;
+		}
+		if (p_instance->ignore_frustum_culling) {
+			idata.flags |= InstanceData::FLAG_IGNORE_FRUSTUM_CULLING;
+		}
+		if (p_instance->ignore_custom_culling) {
+			idata.flags |= InstanceData::FLAG_IGNORE_CUSTOM_CULLING;
 		}
 		if (p_instance->ignore_all_culling) {
 			idata.flags |= InstanceData::FLAG_IGNORE_ALL_CULLING;
@@ -2791,6 +2831,8 @@ void RendererSceneCull::render_camera(const Ref<RenderSceneBuffers> &p_render_bu
 		ERR_FAIL_MSG("Unsupported camera setup.");
 	}
 
+	camera_data.set_custom_culling_planes(camera->custom_culling_planes);
+
 	RID environment = _render_get_environment(p_camera, p_scenario);
 	RID compositor = _render_get_compositor(p_camera, p_scenario);
 
@@ -2944,10 +2986,12 @@ void RendererSceneCull::_scene_cull(CullData &cull_data, InstanceCullResult &cul
 #define VIS_PARENT_CHECK (_visibility_parent_check(cull_data, idata))
 #define VIS_CHECK (visibility_check < 0 ? (visibility_check = (visibility_flags != InstanceData::FLAG_VISIBILITY_DEPENDENCY_NEEDS_CHECK || (VIS_RANGE_CHECK && VIS_PARENT_CHECK))) : visibility_check)
 #define OCCLUSION_CULLED (cull_data.occlusion_buffer != nullptr && (cull_data.scenario->instance_data[i].flags & InstanceData::FLAG_IGNORE_OCCLUSION_CULLING) == 0 && cull_data.occlusion_buffer->is_occluded(cull_data.scenario->instance_aabbs[i].bounds, cull_data.cam_transform.origin, inv_cam_transform, *cull_data.camera_matrix, z_near, is_orthogonal, cull_data.scenario->instance_data[i].occlusion_timeout))
+#define FRUSTUM_CULLED ((cull_data.scenario->instance_data[i].flags & InstanceData::FLAG_IGNORE_FRUSTUM_CULLING) == 0 && !IN_FRUSTUM(cull_data.cull->frustum))
+#define CUSTOM_CULLED ((cull_data.scenario->instance_data[i].flags & InstanceData::FLAG_IGNORE_CUSTOM_CULLING) == 0 && cull_data.cull->custom_planes.plane_count > 0 && !IN_FRUSTUM(cull_data.cull->custom_planes))
 
 		if (!HIDDEN_BY_VISIBILITY_CHECKS) {
 			//if ((LAYER_CHECK && IN_FRUSTUM(cull_data.cull->frustum) && VIS_CHECK && !OCCLUSION_CULLED) || (cull_data.scenario->instance_data[i].flags & InstanceData::FLAG_IGNORE_ALL_CULLING)) {
-			if (LAYER_CHECK && ((IN_FRUSTUM(cull_data.cull->frustum) && VIS_CHECK && !OCCLUSION_CULLED) || (cull_data.scenario->instance_data[i].flags & InstanceData::FLAG_IGNORE_ALL_CULLING))) { // Keep layer check!
+			if ((cull_data.scenario->instance_data[i].flags & InstanceData::FLAG_IGNORE_ALL_CULLING) || (LAYER_CHECK && VIS_CHECK && !FRUSTUM_CULLED && !OCCLUSION_CULLED && !CUSTOM_CULLED)) {
 				uint32_t base_type = idata.flags & InstanceData::FLAG_BASE_TYPE_MASK;
 				if (base_type == RSE::INSTANCE_LIGHT) {
 					cull_result.lights.push_back(idata.instance);
@@ -3282,6 +3326,8 @@ void RendererSceneCull::_scene_cull(CullData &cull_data, InstanceCullResult &cul
 #undef VIS_PARENT_CHECK
 #undef VIS_CHECK
 #undef OCCLUSION_CULLED
+#undef FRUSTUM_CULLED
+#undef CUSTOM_CULLED
 
 		for (uint32_t j = 0; j < cull_data.cull->sdfgi.region_count; j++) {
 			if (cull_data.scenario->instance_aabbs[i].in_aabb(cull_data.cull->sdfgi.region_aabb[j])) {
@@ -3372,6 +3418,7 @@ void RendererSceneCull::_render_scene(const RendererSceneRender::CameraData *p_c
 
 	Vector<Plane> planes = p_camera_data->main_projection.get_projection_planes(p_camera_data->main_transform);
 	cull.frustum = Frustum(planes);
+	cull.custom_planes = Frustum(p_camera_data->custom_culling_planes);
 
 	Vector<RID> directional_lights;
 	// directional lights

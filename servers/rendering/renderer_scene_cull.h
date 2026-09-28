@@ -93,6 +93,8 @@ public:
 		LocalVector<Transform3D> offsets; // camera offsets for each view
 		LocalVector<Projection> projections; // projection matrix for each view
 
+		LocalVector<Plane> custom_culling_planes;
+
 		Camera() {
 			visible_layers = 0xFFFFFFFF;
 			fov = 75;
@@ -120,6 +122,7 @@ public:
 	virtual void camera_set_camera_attributes(RID p_camera, RID p_attributes);
 	virtual void camera_set_compositor(RID p_camera, RID p_compositor);
 	virtual void camera_set_use_vertical_aspect(RID p_camera, bool p_enable);
+	virtual void camera_set_custom_culling_planes(RID p_camera, TypedArray<Plane> p_planes);
 	virtual bool is_camera(RID p_camera) const;
 
 	/* OCCLUDER API */
@@ -280,6 +283,8 @@ public:
 			FLAG_VISIBILITY_DEPENDENCY_FADE_CHILDREN = (1 << 22),
 			FLAG_GEOM_PROJECTOR_SOFTSHADOW_DIRTY = (1 << 23),
 			FLAG_IGNORE_ALL_CULLING = (1 << 24),
+			FLAG_IGNORE_FRUSTUM_CULLING = (1 << 25),
+			FLAG_IGNORE_CUSTOM_CULLING = (1 << 26),
 		};
 
 		uint32_t flags = 0;
@@ -418,8 +423,12 @@ public:
 
 		float lod_bias;
 
-		bool ignore_occlusion_culling;
-		bool ignore_all_culling;
+		//bool ignore_occlusion_culling;
+		//bool ignore_all_culling;
+		uint32_t ignore_occlusion_culling: 1;
+		uint32_t ignore_frustum_culling : 1;
+		uint32_t ignore_custom_culling : 1;
+		uint32_t ignore_all_culling : 1;
 
 		Vector<RID> materials;
 
@@ -580,6 +589,8 @@ public:
 			lightmap_cull_index = 0;
 			lod_bias = 1.0;
 			ignore_occlusion_culling = false;
+			ignore_frustum_culling = false;
+			ignore_custom_culling = false;
 			ignore_all_culling = false;
 
 			scenario = nullptr;
@@ -1123,6 +1134,7 @@ public:
 		SpinLock lock;
 
 		Frustum frustum;
+		Frustum custom_planes;
 	} cull;
 
 	struct VisibilityCullData {

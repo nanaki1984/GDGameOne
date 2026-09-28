@@ -68,6 +68,17 @@ void RendererSceneRender::CameraData::set_multiview_camera(const Transform3D &p_
 	}
 }
 
+void RendererSceneRender::CameraData::set_custom_culling_planes(const LocalVector<Plane> &p_planes) {
+	Basis b = main_transform.basis.inverse();
+	b.transpose();
+
+	custom_culling_planes.clear();
+	custom_culling_planes.reserve_exact(p_planes.size());
+	for (auto &plane : p_planes) {
+		custom_culling_planes.push_back(main_transform.xform_fast(plane, b));
+	}
+}
+
 /* Compositor effect API */
 
 RID RendererSceneRender::compositor_effect_allocate() {
