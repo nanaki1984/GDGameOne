@@ -2523,6 +2523,18 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 
 	PagedArray<RID> empty;
 
+    switch (rt->render_path) {
+        case RSE::VIEWPORT_RENDER_PATH_SM:
+        case RSE::VIEWPORT_RENDER_PATH_PSM: {
+            render_data.lights = &empty;
+            render_data.reflection_probes = &empty;
+            render_data.environment = RID();
+            render_data.render_shadow_count = 0;
+            apply_environment_effects_in_post = false;
+        } break;
+        default: break;
+    }
+
 	if (get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_UNSHADED) {
 		render_data.lights = &empty;
 		render_data.reflection_probes = &empty;
@@ -2607,7 +2619,38 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 	_setup_lights(&render_data, true, render_data.directional_light_count, render_data.omni_light_count, render_data.spot_light_count, render_data.area_light_count, render_data.directional_shadow_count);
 	_setup_environment(&render_data, is_reflection_probe, screen_size, flip_y, clear_color, false);
 
+	switch (rt->render_path) {
+		case RSE::VIEWPORT_RENDER_PATH_DEFAULT: {
+		} break;
+		case RSE::VIEWPORT_RENDER_PATH_SM:
+		case RSE::VIEWPORT_RENDER_PATH_PSM: {
+			scene_state.data.use_ambient_light = false;
+			scene_state.data.ambient_light_color_energy[0] = 1;
+			scene_state.data.ambient_light_color_energy[1] = 1;
+			scene_state.data.ambient_light_color_energy[2] = 1;
+			scene_state.data.ambient_light_color_energy[3] = 1.0;
+
+			scene_state.data.reflection_color[0] = 0.0;
+			scene_state.data.reflection_color[1] = 0.0;
+			scene_state.data.reflection_color[2] = 0.0;
+			scene_state.data.use_reflection_color = false;
+
+			scene_state.data.use_ambient_cubemap = false;
+			scene_state.data.use_reflection_cubemap = false;
+		} break;
+	}
+/*
 	_fill_render_list(RENDER_LIST_OPAQUE, &render_data, PASS_MODE_COLOR);
+*/
+	switch (rt->render_path) {
+		case RSE::VIEWPORT_RENDER_PATH_DEFAULT: {
+			_fill_render_list(RENDER_LIST_OPAQUE, &render_data, PASS_MODE_COLOR);
+		} break;
+		case RSE::VIEWPORT_RENDER_PATH_SM:
+		case RSE::VIEWPORT_RENDER_PATH_PSM: {
+			_fill_render_list(RENDER_LIST_OPAQUE, &render_data, PASS_MODE_SHADOW);
+		} break;
+	}
 	render_list[RENDER_LIST_OPAQUE].sort_by_key();
 	render_list[RENDER_LIST_ALPHA].sort_by_reverse_depth_and_priority();
 
@@ -2699,6 +2742,14 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 		}
 	}
 
+	switch (rt->render_path) {
+		case RSE::VIEWPORT_RENDER_PATH_SM:
+		case RSE::VIEWPORT_RENDER_PATH_PSM: {
+			clear_color = Color(0, 0, 0, 0);
+		} break;
+		default: break;
+	}
+
 	scene_state.reset_gl_state();
 
 	GLuint motion_vectors_fbo = (rt && !rb->emulate_multiview) ? rt->overridden.velocity_fbo : 0;
@@ -2781,6 +2832,15 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 
 		// Don't do depth prepass we are rendering overdraw
 		use_depth_prepass = use_depth_prepass && get_debug_draw_mode() != RSE::VIEWPORT_DEBUG_DRAW_OVERDRAW;
+
+		// Disable on other render paths
+		switch (rt->render_path) {
+			case RSE::VIEWPORT_RENDER_PATH_SM:
+			case RSE::VIEWPORT_RENDER_PATH_PSM: {
+				use_depth_prepass = false;
+			} break;
+			default: break;
+		}
 
 		if (use_depth_prepass) {
 			RENDER_TIMESTAMP("Depth Prepass");
@@ -2904,6 +2964,23 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 			}
 		}
 
+		// Specialization Constants on other render paths
+		switch (rt->render_path) {
+			case RSE::VIEWPORT_RENDER_PATH_SM:
+			case RSE::VIEWPORT_RENDER_PATH_PSM: {
+				spec_constant_base_flags = 0;
+				spec_constant_base_flags |= SceneShaderGLES3::DISABLE_LIGHTMAP;
+				spec_constant_base_flags |= SceneShaderGLES3::DISABLE_LIGHT_DIRECTIONAL;
+				spec_constant_base_flags |= SceneShaderGLES3::DISABLE_LIGHT_OMNI;
+				spec_constant_base_flags |= SceneShaderGLES3::DISABLE_LIGHT_SPOT;
+				spec_constant_base_flags |= SceneShaderGLES3::DISABLE_LIGHT_AREA;
+				spec_constant_base_flags |= SceneShaderGLES3::DISABLE_REFLECTION_PROBE;
+				spec_constant_base_flags |= SceneShaderGLES3::DISABLE_FOG;
+				spec_constant_base_flags |= (rt->render_path == RSE::VIEWPORT_RENDER_PATH_PSM ? SceneShaderGLES3::CUSTOM_PSM : SceneShaderGLES3::CUSTOM_SM);
+			} break;
+			default: break;
+		}
+
 		if (draw_feed && camera_feed_id > -1) {
 			RENDER_TIMESTAMP("Render Camera feed");
 
@@ -2926,10 +3003,27 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 			scene_state.enable_gl_blend(true);
 		}
 
+/*
 		// Render Opaque Objects.
 		RenderListParameters render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, spec_constant_base_flags, use_wireframe);
 
 		_render_list_template<PASS_MODE_COLOR>(&render_list_params, &render_data, 0, render_list[RENDER_LIST_OPAQUE].elements.size());
+*/
+		switch (rt->render_path) {
+			case RSE::VIEWPORT_RENDER_PATH_DEFAULT: {
+				// Render Opaque Objects.
+				RenderListParameters render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, spec_constant_base_flags, use_wireframe);
+
+				_render_list_template<PASS_MODE_COLOR>(&render_list_params, &render_data, 0, render_list[RENDER_LIST_OPAQUE].elements.size());
+			} break;
+			case RSE::VIEWPORT_RENDER_PATH_SM:
+			case RSE::VIEWPORT_RENDER_PATH_PSM: {
+				// Render Opaque Objects. (Using PASS_MODE_SHADOW)
+				RenderListParameters render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, spec_constant_base_flags, use_wireframe);
+
+				_render_list_template<PASS_MODE_SHADOW>(&render_list_params, &render_data, 0, render_list[RENDER_LIST_OPAQUE].elements.size());
+			} break;
+		}
 
 		scene_state.enable_gl_depth_draw(false);
 		scene_state.enable_gl_stencil_test(false);
@@ -2986,10 +3080,24 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 		RENDER_TIMESTAMP("Render 3D Transparent Pass");
 		scene_state.enable_gl_blend(true);
 
+/*
 		//Render transparent pass
 		RenderListParameters render_list_params_alpha(render_list[RENDER_LIST_ALPHA].elements.ptr(), render_list[RENDER_LIST_ALPHA].elements.size(), reverse_cull, spec_constant_base_flags, use_wireframe);
 
 		_render_list_template<PASS_MODE_COLOR_TRANSPARENT>(&render_list_params_alpha, &render_data, 0, render_list[RENDER_LIST_ALPHA].elements.size(), true);
+*/
+		switch (rt->render_path) {
+			case RSE::VIEWPORT_RENDER_PATH_DEFAULT: {
+				//Render transparent pass
+				RenderListParameters render_list_params_alpha(render_list[RENDER_LIST_ALPHA].elements.ptr(), render_list[RENDER_LIST_ALPHA].elements.size(), reverse_cull, spec_constant_base_flags, use_wireframe);
+
+				_render_list_template<PASS_MODE_COLOR_TRANSPARENT>(&render_list_params_alpha, &render_data, 0, render_list[RENDER_LIST_ALPHA].elements.size(), true);
+			} break;
+			case RSE::VIEWPORT_RENDER_PATH_SM:
+			case RSE::VIEWPORT_RENDER_PATH_PSM: {
+				// Skip transparent objects
+			} break;
+		}
 
 		scene_state.enable_gl_stencil_test(false);
 
