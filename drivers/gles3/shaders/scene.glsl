@@ -2975,12 +2975,12 @@ void main() {
 #if defined(CUSTOM_SM) || defined(CUSTOM_PSM)
 	float frag_depth = gl_FragCoord.z;
 #	ifdef CUSTOM_PSM
-	if (vertex.z > 0.0) {
+	if (vertex.z > scene_data_block.data.z_near) {
 		discard;
 	}
 	gl_FragDepth = frag_depth = (scene_data_block.data.z_far - length(vertex)) / scene_data_block.data.z_far;
 #	endif // CUSTOM_PSM
-    frag_color = vec4(frag_depth, 0.0, 0.0, 1.0);
+    frag_color = vec4(max(0.0, frag_depth), 0.0, 0.0, 1.0);
 #endif // CUSTOM_SM || CUSTOMPSM
 
 // Nothing happens, so a tree-ssa optimizer will result in no fragment shader :)
