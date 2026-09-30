@@ -2351,14 +2351,10 @@ void DocumentEditorContainer::_connect_to_scene() {
 	if (!edited_scene) {
 		return;
 	}
-	_connect_to_scene_recursive(edited_scene, edited_scene);
+	_connect_to_scene_recursive(edited_scene);
 }
 
-void DocumentEditorContainer::_connect_to_scene_recursive(Node *p_current, Node *p_base) {
-	if (p_current != p_base && p_current->get_owner() != p_base) {
-		return;
-	}
-
+void DocumentEditorContainer::_connect_to_scene_recursive(Node *p_current) {
 	_queue_update_list();
 	const Callable update_callable = callable_mp(this, &DocumentEditorContainer::_queue_update_list);
 	if (p_current->is_connected(CoreStringName(script_changed), update_callable)) {
@@ -2366,11 +2362,8 @@ void DocumentEditorContainer::_connect_to_scene_recursive(Node *p_current, Node 
 	}
 	p_current->connect(CoreStringName(script_changed), update_callable);
 	p_current->connect(SceneStringName(tree_exited), update_callable);
-	p_current->connect(SNAME("child_entered_tree"), callable_mp(this, &DocumentEditorContainer::_connect_to_scene_recursive).bind(p_base), CONNECT_DEFERRED);
-
-	for (Node *child : p_current->iterate_children()) {
-		_connect_to_scene_recursive(child, p_base);
-	}
+	// Use `child_entered_tree` to recursively connect to children.
+	p_current->connect(SNAME("child_entered_tree"), callable_mp(this, &DocumentEditorContainer::_connect_to_scene_recursive));
 }
 
 void DocumentEditorContainer::_update_document_list() {
@@ -3733,6 +3726,15 @@ void DocumentEditorContainer::update_docs_from_script(const Ref<Script> &p_scrip
 	}
 }
 
+void ScriptEditor::rename_symbol(const String &p_symbol, const EditorLanguage::LookupResult &p_lookup) {
+	FindInFiles::get_singleton()->get_container()->create_rename_control(p_symbol, p_lookup);
+	FindInFiles::get_singleton()->get_dock()->make_visible();
+
+	LineEdit *name_edit = FindInFiles::get_singleton()->get_container()->get_search_control()->get_rename_line_edit();
+	callable_mp((Control *)name_edit, &Control::grab_focus).call_deferred(false);
+	callable_mp(name_edit, &LineEdit::select_all).call_deferred();
+}
+
 void DocumentEditorContainer::_update_selected_editor_menu() {
 	for (ScriptEditorBase::EditMenusBase *editor_menu : editor_menus) {
 		editor_menu->set_visible(editor_menu->handles(_get_current_editor()));
@@ -4055,6 +4057,7 @@ DocumentEditorContainer::DocumentEditorContainer(bool p_is_main_editor, const St
 	toggle_files_button->connect(SceneStringName(toggled), callable_mp(this, &DocumentEditorContainer::_toggle_files_pressed));
 	toggle_files_button->set_accessibility_name(TTRC("Toggle Document List"));
 	toggle_files_button->set_toggle_mode(true);
+	toggle_files_button->set_flat(true);
 	toggle_files_button->set_shortcut_context(this);
 	toggle_files_button->set_shortcut(ED_GET_SHORTCUT("script_editor/toggle_files_panel"));
 	menu_hb->add_child(toggle_files_button);
