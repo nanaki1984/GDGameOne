@@ -2819,11 +2819,6 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 		glViewport(0, 0, rb->internal_size.x, rb->internal_size.y);
 
-		// If SSAO is enabled, we definitely need the depth buffer.
-		if (ssao_enabled) {
-			scene_state.used_depth_texture = true;
-		}
-
 		// Do depth prepass if it's explicitly enabled
 		bool use_depth_prepass = config->use_depth_prepass;
 
@@ -3067,7 +3062,7 @@ void RasterizerSceneGLES3::render_scene(const Ref<RenderSceneBuffers> &p_render_
 				if (scene_state.used_depth_texture) {
 					glBlitFramebuffer(0, 0, size.x, size.y,
 							0, 0, size.x, size.y,
-							GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+							GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 					glActiveTexture(GL_TEXTURE0 + config->max_texture_image_units - 7);
 					glBindTexture(GL_TEXTURE_2D, backbuffer_depth);
 				}
@@ -3255,7 +3250,7 @@ void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_rend
 			// Copy depth buffer
 			glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo_int);
 			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_rt);
-			glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+			glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo_rt);
@@ -3337,7 +3332,7 @@ void RasterizerSceneGLES3::_render_post_processing(const RenderDataGLES3 *p_rend
 				glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, read_depth, 0, v);
 				glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, write_depth, 0, v);
 
-				glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+				glBlitFramebuffer(0, 0, internal_size.x, internal_size.y, 0, 0, target_size.x, target_size.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 			}
 		}
 
