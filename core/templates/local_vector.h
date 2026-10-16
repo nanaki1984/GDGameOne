@@ -398,6 +398,13 @@ public:
 	}
 
 	void operator=(Span<T> p_from) {
+		if constexpr (force_trivial) {
+			// Copy every element in new LocalVector (using copy ctor) and move it here.
+			// Reason: we can't use copy assign operator, since data might be garbage!
+			*this = std::move(LocalVector(p_from));
+			return;
+		}
+
 		resize(p_from.size());
 		for (size_t i = 0; i < p_from.size(); i++) {
 			data[i] = p_from[i];
@@ -419,6 +426,8 @@ public:
 		p_from.capacity = 0;
 	}
 	void operator=(Vector<T> &&p_from) {
+		static_assert(!force_trivial, "NOT IMPLEMENTED!");
+
 		resize(p_from.size());
 		for (U i = 0; i < count; i++) {
 			data[i] = std::move(p_from[i]);
