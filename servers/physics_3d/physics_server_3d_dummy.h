@@ -126,6 +126,9 @@ public:
 	virtual bool rest_info(const PS3DT::ShapeParameters &p_parameters, PS3DT::ShapeRestInfo *r_info) override { return false; }
 
 	virtual Vector3 get_closest_point_to_object_volume(RID p_object, const Vector3 p_point) const override { return Vector3(); }
+
+	virtual int cast_ray_multi(const PS3DT::RayParameters &p_parameters, PS3DT::RayResult *r_results, int p_result_max) override { return 0; }
+
 };
 
 class PhysicsServer3DDummy : public PhysicsServer3D {

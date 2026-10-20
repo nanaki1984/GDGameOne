@@ -141,6 +141,8 @@ protected:
 	GDVIRTUAL8R_REQUIRED(bool, _rest_info, RID, const Transform3D &, const Vector3 &, real_t, uint32_t, bool, bool, GDExtensionPtr<PhysicsServer3DExtensionShapeRestInfo>)
 	GDVIRTUAL2RC_REQUIRED(Vector3, _get_closest_point_to_object_volume, RID, const Vector3 &)
 
+	GDVIRTUAL10R_REQUIRED(int, _cast_ray_multi, const Vector3 &, const Vector3 &, uint32_t, bool, bool, bool, bool, bool, GDExtensionPtr<PhysicsServer3DExtensionRayResult>, int)
+
 public:
 	virtual bool intersect_ray(const PS3DT::RayParameters &p_parameters, PS3DT::RayResult &r_result) override {
 		exclude = &p_parameters.exclude;
@@ -188,6 +190,14 @@ public:
 	virtual Vector3 get_closest_point_to_object_volume(RID p_object, const Vector3 p_point) const override {
 		Vector3 ret;
 		GDVIRTUAL_CALL(_get_closest_point_to_object_volume, p_object, p_point, ret);
+		return ret;
+	}
+
+	virtual int cast_ray_multi(const PS3DT::RayParameters &p_parameters, PS3DT::RayResult *r_results, int p_result_max) override {
+		exclude = &p_parameters.exclude;
+		int ret = 0;
+		GDVIRTUAL_CALL(_cast_ray_multi, p_parameters.from, p_parameters.to, p_parameters.collision_mask, p_parameters.collide_with_bodies, p_parameters.collide_with_areas, p_parameters.hit_from_inside, p_parameters.hit_back_faces, p_parameters.pick_ray, r_results, p_result_max, ret);
+		exclude = nullptr;
 		return ret;
 	}
 

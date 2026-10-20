@@ -81,4 +81,7 @@ public:
 	bool body_test_motion(const JoltBody3D &p_body, const PS3DT::MotionParameters &p_parameters, PS3DT::MotionResult *r_result) const;
 
 	JoltSpace3D &get_space() const { return *space; }
+
+	virtual int cast_ray_multi(const PS3DT::RayParameters &p_parameters, PS3DT::RayResult *r_results, int p_result_max) override;
+
 };
