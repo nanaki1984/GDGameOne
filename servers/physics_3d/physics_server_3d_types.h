@@ -79,6 +79,45 @@ struct RayResult {
 GODOT_POP_IGNORE_DEPRECATION()
 
 GODOT_PUSH_IGNORE_DEPRECATION() // For implicit constructors etc.
+struct CastResult {
+	Vector3 position; // same as RayResult
+	Vector3 normal; // same as RayResult (normal on other body)
+
+	Vector3 contact_point; // same as position for rays, or shape contact point
+	Vector3 contact_normal; // same as normal for rays, or shape penetration axis (if penetrating, otherwise normal on shape I guess...have to check)
+
+	float penetration_depth = .0f;
+
+	RID rid;
+	ObjectID collider_id;
+
+	int shape = 0;
+	int face_index = -1;
+
+	_FORCE_INLINE_ Object *get_collider() const {
+		if (collider_id.is_valid()) {
+			return ObjectDB::get_instance(collider_id);
+		} else {
+			return nullptr;
+		}
+	}
+
+	_FORCE_INLINE_ float get_fraction(const Vector3 &p_start, const Vector3 &p_end) const {
+		const Vector3 delta = p_end - p_start;
+		return delta.is_zero_approx() ? .0f : (position - p_start).dot(delta) / delta.length_squared();
+	}
+
+	_FORCE_INLINE_ bool from_inside() const {
+		return penetration_depth > .0f;
+	}
+
+	_FORCE_INLINE_ Vector3 get_other_contact_point() const {
+		return contact_point - contact_normal * penetration_depth;
+	}
+};
+GODOT_POP_IGNORE_DEPRECATION()
+
+GODOT_PUSH_IGNORE_DEPRECATION() // For implicit constructors etc.
 struct ShapeResult {
 	RID rid;
 	ObjectID collider_id;
@@ -120,6 +159,9 @@ struct ShapeParameters {
 
 	bool collide_with_bodies = true;
 	bool collide_with_areas = false;
+
+	bool hit_from_inside = false;
+	bool hit_back_faces = true;
 };
 
 struct ShapeRestInfo {

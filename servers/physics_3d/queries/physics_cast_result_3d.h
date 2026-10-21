@@ -33,30 +33,39 @@
 #include "core/object/ref_counted.h"
 #include "servers/physics_3d/physics_server_3d_types.h"
 
-class PhysicsCastRayMultiResult3D : public RefCounted {
-	GDCLASS(PhysicsCastRayMultiResult3D, RefCounted);
+class PhysicsCastResult3D : public RefCounted {
+	GDCLASS(PhysicsCastResult3D, RefCounted);
 
 	friend class PhysicsDirectSpaceState3D;
 
-	LocalVector<PS3DT::RayResult> result;
+	LocalVector<PS3DT::CastResult> result;
 	int hit_count = 0;
 
 protected:
 	static void _bind_methods();
 
 public:
-	PhysicsCastRayMultiResult3D(int p_max_hits = 32);
+	PhysicsCastResult3D(int p_max_hits = 32);
 
 	int get_max_hits() const;
 	void set_max_hits(int p_max_hits);
 
 	int get_hit_count() const;
 
-    Vector3 get_position(int p_hit_index) const;
-	Vector3 get_normal(int p_hit_index) const;
-	RID get_collider_rid(int p_hit_index) const;
-	ObjectID get_collider_id(int p_hit_index) const;
-	Object *get_collider(int p_hit_index) const;
-	int get_collider_shape(int p_hit_index) const;
-	int get_collider_face_index(int p_hit_index) const;
+    Vector3 get_position(int p_hit_index = 0) const;
+	Vector3 get_normal(int p_hit_index = 0) const;
+
+	Vector3 get_contact_point(int p_hit_index = 0) const;
+	Vector3 get_contact_normal(int p_hit_index = 0) const;
+
+	bool from_inside(int p_hit_index = 0) const;
+	float get_penetration_depth(int p_hit_index = 0) const;
+	Vector3 get_other_contact_point(int p_hit_index = 0) const;
+
+	RID get_collider_rid(int p_hit_index = 0) const;
+	ObjectID get_collider_id(int p_hit_index = 0) const;
+	Object *get_collider(int p_hit_index = 0) const;
+
+	int get_collider_shape(int p_hit_index = 0) const;
+	int get_collider_face_index(int p_hit_index = 0) const;
 };

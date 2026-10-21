@@ -42,7 +42,7 @@
 #include "servers/physics_3d/queries/physics_ray_query_parameters_3d.h"
 #include "servers/physics_3d/queries/physics_shape_query_parameters_3d.h"
 
-#include "servers/physics_3d/queries/physics_cast_ray_multi_result_3d.h"
+#include "servers/physics_3d/queries/physics_cast_result_3d.h"
 
 class PhysicsDirectSpaceState3D : public Object {
 	GDCLASS(PhysicsDirectSpaceState3D, Object);
@@ -62,7 +62,8 @@ private:
 	bool _collide_shape_into(RequiredParam<PhysicsShapeQueryParameters3D> p_shape_query, RequiredParam<PhysicsCollideShapeResult3D> p_result);
 	bool _get_rest_info_into(RequiredParam<PhysicsShapeQueryParameters3D> p_shape_query, RequiredParam<PhysicsGetRestInfoResult3D> p_result);
 
-	bool _cast_ray_multi(RequiredParam<PhysicsRayQueryParameters3D> p_ray_query, RequiredParam<PhysicsCastRayMultiResult3D> p_result);
+	bool _cast_ray(RequiredParam<PhysicsRayQueryParameters3D> p_ray_query, RequiredParam<PhysicsCastResult3D> p_result);
+	bool _cast_shape(RequiredParam<PhysicsShapeQueryParameters3D> p_shape_query, RequiredParam<PhysicsCastResult3D> p_result);
 
 protected:
 	static void _bind_methods();
@@ -77,7 +78,8 @@ public:
 
 	virtual Vector3 get_closest_point_to_object_volume(RID p_object, const Vector3 p_point) const = 0;
 
-	virtual int cast_ray_multi(const PS3DT::RayParameters &p_parameters, PS3DT::RayResult *r_results, int p_result_max) = 0;
+	virtual int cast_ray(const PS3DT::RayParameters &p_parameters, PS3DT::CastResult *r_results, int p_result_max) = 0;
+	virtual int cast_shape(const PS3DT::ShapeParameters &p_parameters, PS3DT::CastResult *r_results, int p_result_max) = 0;
 
 	PhysicsDirectSpaceState3D();
 };

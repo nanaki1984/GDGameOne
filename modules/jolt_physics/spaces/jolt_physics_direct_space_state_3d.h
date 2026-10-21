@@ -82,6 +82,7 @@ public:
 
 	JoltSpace3D &get_space() const { return *space; }
 
-	virtual int cast_ray_multi(const PS3DT::RayParameters &p_parameters, PS3DT::RayResult *r_results, int p_result_max) override;
+	virtual int cast_ray(const PS3DT::RayParameters &p_parameters, PS3DT::CastResult *r_results, int p_result_max) override;
+	virtual int cast_shape(const PS3DT::ShapeParameters &p_parameters, PS3DT::CastResult *r_results, int p_result_max) override;
 
 };

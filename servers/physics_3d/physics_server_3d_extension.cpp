@@ -48,6 +48,9 @@ void PhysicsDirectSpaceState3DExtension::_bind_methods() {
 	GDVIRTUAL_BIND(_collide_shape, "shape_rid", "transform", "motion", "margin", "collision_mask", "collide_with_bodies", "collide_with_areas", "r_results", "max_results", "r_result_count");
 	GDVIRTUAL_BIND(_rest_info, "shape_rid", "transform", "motion", "margin", "collision_mask", "collide_with_bodies", "collide_with_areas", "r_rest_info");
 	GDVIRTUAL_BIND(_get_closest_point_to_object_volume, "object", "point");
+
+	GDVIRTUAL_BIND(_cast_ray, "from", "to", "collision_mask", "collide_with_bodies", "collide_with_areas", "hit_from_inside", "hit_back_faces", "pick_ray", "r_results", "max_results")
+	GDVIRTUAL_BIND(_cast_shape, "shape_rid", "transform", "motion", "margin", "collision_mask", "collide_with_bodies", "collide_with_areas", "hit_from_inside", "hit_back_faces", "r_results", "max_results")
 }
 
 PhysicsDirectSpaceState3DExtension::PhysicsDirectSpaceState3DExtension() {

@@ -56,6 +56,8 @@
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 
+#include <optional>
+
 bool JoltPhysicsDirectSpaceState3D::_cast_motion_impl(const JPH::Shape &p_jolt_shape, const Transform3D &p_transform_com, const Vector3 &p_scale, const Vector3 &p_motion, bool p_use_edge_removal, bool p_ignore_overlaps, const JPH::CollideShapeSettings &p_settings, const JPH::BroadPhaseLayerFilter &p_broad_phase_layer_filter, const JPH::ObjectLayerFilter &p_object_layer_filter, const JPH::BodyFilter &p_body_filter, const JPH::ShapeFilter &p_shape_filter, real_t &r_closest_safe, real_t &r_closest_unsafe) const {
 	r_closest_safe = 1.0f;
 	r_closest_unsafe = 1.0f;
@@ -511,77 +513,6 @@ bool JoltPhysicsDirectSpaceState3D::intersect_ray(const PS3DT::RayParameters &p_
 	return true;
 }
 
-int JoltPhysicsDirectSpaceState3D::cast_ray_multi(const PS3DT::RayParameters &p_parameters, PS3DT::RayResult *r_results, int p_result_max) {
-	ERR_FAIL_COND_V_MSG(space->is_stepping(), 0, "intersect_ray must not be called while the physics space is being stepped.");
-
-	if (p_result_max <= 0) {
-		return 0;
-	}
-
-	space->flush_pending_objects();
-
-	const JoltQueryFilter3D query_filter(*this, p_parameters.collision_mask, p_parameters.collide_with_bodies, p_parameters.collide_with_areas, p_parameters.exclude, p_parameters.pick_ray);
-
-	const JPH::RVec3 from = to_jolt_r(p_parameters.from);
-	const JPH::RVec3 to = to_jolt_r(p_parameters.to);
-	const JPH::Vec3 vector = JPH::Vec3(to - from);
-	const JPH::RRayCast ray(from, vector);
-
-	const JPH::EBackFaceMode back_face_mode = p_parameters.hit_back_faces ? JPH::EBackFaceMode::CollideWithBackFaces : JPH::EBackFaceMode::IgnoreBackFaces;
-
-	JPH::RayCastSettings settings;
-	settings.mTreatConvexAsSolid = p_parameters.hit_from_inside;
-	settings.mBackFaceModeTriangles = back_face_mode;
-
-	JoltQueryCollectorClosestMulti<JPH::CastRayCollector, 32> collector(p_result_max);
-	space->get_narrow_phase_query().CastRay(ray, settings, collector, query_filter, query_filter, query_filter);
-
-	if (!collector.had_hit()) {
-		return 0;
-	}
-
-	const int hit_count = collector.get_hit_count();
-
-	for (int i = 0; i < hit_count; ++i) {
-		const JPH::RayCastResult &hit = collector.get_hit(i);
-
-		const JPH::BodyID &body_id = hit.mBodyID;
-		const JPH::SubShapeID &sub_shape_id = hit.mSubShapeID2;
-
-		const JoltObject3D *object = space->try_get_object(body_id);
-		ERR_FAIL_NULL_V(object, false);
-
-		const JPH::RVec3 position = ray.GetPointOnRay(hit.mFraction);
-
-		JPH::Vec3 normal = JPH::Vec3::sZero();
-
-		if (!p_parameters.hit_from_inside || hit.mFraction > 0.0f) {
-			normal = object->get_jolt_body()->GetWorldSpaceSurfaceNormal(sub_shape_id, position);
-
-			// If we got a back-face normal we need to flip it.
-			if (normal.Dot(vector) > 0) {
-				normal = -normal;
-			}
-		}
-
-		PS3DT::RayResult &new_result = *r_results++;
-		new_result.position = to_godot(position);
-		new_result.normal = to_godot(normal);
-		new_result.rid = object->get_rid();
-		new_result.collider_id = object->get_instance_id();
-		new_result.shape = 0;
-
-		if (const JoltShapedObject3D *shaped_object = object->as_shaped()) {
-			const int shape_index = shaped_object->find_shape_index(sub_shape_id);
-			ERR_FAIL_COND_V(shape_index == -1, 0);
-			new_result.shape = shape_index;
-			new_result.face_index = _try_get_face_index(*object->get_jolt_body(), sub_shape_id);
-		}
-	}
-
-	return hit_count;
-}
-
 int JoltPhysicsDirectSpaceState3D::intersect_point(const PS3DT::PointParameters &p_parameters, PS3DT::ShapeResult *r_results, int p_result_max) {
 	ERR_FAIL_COND_V_MSG(space->is_stepping(), false, "intersect_point must not be called while the physics space is being stepped.");
 
@@ -995,4 +926,104 @@ bool JoltPhysicsDirectSpaceState3D::body_test_motion(const JoltBody3D &p_body, c
 	}
 
 	return collided;
+}
+
+int JoltPhysicsDirectSpaceState3D::cast_ray(const PS3DT::RayParameters &p_parameters, PS3DT::CastResult *r_results, int p_result_max) {
+	ERR_FAIL_COND_V_MSG(space->is_stepping(), 0, "cast_ray must not be called while the physics space is being stepped.");
+
+	if (p_result_max <= 0) {
+		return 0;
+	}
+
+	space->flush_pending_objects();
+
+	const JoltQueryFilter3D query_filter(*this, p_parameters.collision_mask, p_parameters.collide_with_bodies, p_parameters.collide_with_areas, p_parameters.exclude, p_parameters.pick_ray);
+
+	const JPH::RVec3 from = to_jolt_r(p_parameters.from);
+	const JPH::RVec3 to = to_jolt_r(p_parameters.to);
+	const JPH::Vec3 vector = JPH::Vec3(to - from);
+	const JPH::RRayCast ray(from, vector);
+
+	const JPH::EBackFaceMode back_face_mode = p_parameters.hit_back_faces ? JPH::EBackFaceMode::CollideWithBackFaces : JPH::EBackFaceMode::IgnoreBackFaces;
+
+	JPH::RayCastSettings settings;
+	settings.mTreatConvexAsSolid = p_parameters.hit_from_inside;
+	settings.mBackFaceModeTriangles = back_face_mode;
+
+	auto hit_to_godot = [&](const JPH::RayCastResult &p_hit) -> std::optional<PS3DT::CastResult> {
+		if (!p_parameters.hit_from_inside || p_hit.mFraction > 0.0f) {
+			const JPH::BodyID &body_id = p_hit.mBodyID;
+			const JPH::SubShapeID &sub_shape_id = p_hit.mSubShapeID2;
+
+			const JoltObject3D *object = space->try_get_object(body_id);
+			ERR_FAIL_NULL_V(object, { });
+
+			const JPH::RVec3 position = ray.GetPointOnRay(p_hit.mFraction);
+			JPH::Vec3 normal = object->get_jolt_body()->GetWorldSpaceSurfaceNormal(sub_shape_id, position);
+
+			// If we got a back-face normal we need to flip it.
+			if (normal.Dot(vector) > 0) {
+				normal = -normal;
+			}
+
+			PS3DT::CastResult new_result;
+
+			new_result.position = new_result.contact_point = to_godot(position);
+			new_result.normal = new_result.contact_normal = to_godot(normal);
+			new_result.rid = object->get_rid();
+			new_result.collider_id = object->get_instance_id();
+			new_result.shape = 0;
+
+			if (const JoltShapedObject3D *shaped_object = object->as_shaped()) {
+				const int shape_index = shaped_object->find_shape_index(sub_shape_id);
+				ERR_FAIL_COND_V(shape_index == -1, { });
+				new_result.shape = shape_index;
+				new_result.face_index = _try_get_face_index(*object->get_jolt_body(), sub_shape_id);
+			}
+
+			return new_result;
+		}
+		return { };
+	};
+
+	if (p_result_max == 1) {
+		JoltQueryCollectorClosest<JPH::CastRayCollector> collector;
+		space->get_narrow_phase_query().CastRay(ray, settings, collector, query_filter, query_filter, query_filter);
+
+		if (!collector.had_hit()) {
+			return 0;
+		}
+
+		auto hit = hit_to_godot(collector.get_hit());
+		if (hit) {
+			*r_results = *hit;
+			return 1;
+		}
+
+		return 0;
+	} else {
+		JoltQueryCollectorClosestMulti<JPH::CastRayCollector, 32> collector(p_result_max);
+		space->get_narrow_phase_query().CastRay(ray, settings, collector, query_filter, query_filter, query_filter);
+
+		if (!collector.had_hit()) {
+			return 0;
+		}
+
+		const int hit_count = collector.get_hit_count();
+		int actual_hit_count = 0;
+
+		for (int i = 0; i < hit_count; ++i) {
+			auto hit = hit_to_godot(collector.get_hit(i));
+			if (hit) {
+				(*r_results++) = *hit;
+				++actual_hit_count;
+			}
+		}
+
+		return actual_hit_count;
+	}
+}
+
+int JoltPhysicsDirectSpaceState3D::cast_shape(const PS3DT::ShapeParameters &p_parameters, PS3DT::CastResult *r_results, int p_result_max) {
+	return 0;
 }

@@ -368,7 +368,7 @@ void register_server_types() {
 	GDREGISTER_CLASS(PhysicsTestMotionParameters3D);
 	GDREGISTER_CLASS(PhysicsTestMotionResult3D);
 
-	GDREGISTER_CLASS(PhysicsCastRayMultiResult3D);
+	GDREGISTER_CLASS(PhysicsCastResult3D);
 
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, PhysicsServer3DManager::setting_property_name, PROPERTY_HINT_ENUM, "DEFAULT"), "DEFAULT");
 

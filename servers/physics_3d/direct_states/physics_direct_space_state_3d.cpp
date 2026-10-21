@@ -203,11 +203,20 @@ bool PhysicsDirectSpaceState3D::_get_rest_info_into(RequiredParam<PhysicsShapeQu
 	return rest_info(shape_query->get_parameters(), &result->result);
 }
 
-bool PhysicsDirectSpaceState3D::_cast_ray_multi(RequiredParam<PhysicsRayQueryParameters3D> p_ray_query, RequiredParam<PhysicsCastRayMultiResult3D> p_result) {
+bool PhysicsDirectSpaceState3D::_cast_ray(RequiredParam<PhysicsRayQueryParameters3D> p_ray_query, RequiredParam<PhysicsCastResult3D> p_result) {
 	EXTRACT_PARAM_OR_FAIL_V(ray_query, p_ray_query, false);
 	EXTRACT_PARAM_OR_FAIL_V(result, p_result, false);
 
-	result->hit_count = cast_ray_multi(ray_query->get_parameters(), result->result.ptr(), result->get_max_hits());
+	result->hit_count = cast_ray(ray_query->get_parameters(), result->result.ptr(), result->get_max_hits());
+
+	return result->hit_count > 0;
+}
+
+bool PhysicsDirectSpaceState3D::_cast_shape(RequiredParam<PhysicsShapeQueryParameters3D> p_shape_query, RequiredParam<PhysicsCastResult3D> p_result) {
+	EXTRACT_PARAM_OR_FAIL_V(shape_query, p_shape_query, false);
+	EXTRACT_PARAM_OR_FAIL_V(result, p_result, false);
+
+	result->hit_count = cast_shape(shape_query->get_parameters(), result->result.ptr(), result->get_max_hits());
 
 	return result->hit_count > 0;
 }
@@ -230,5 +239,6 @@ void PhysicsDirectSpaceState3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("collide_shape_into", "parameters", "result"), &PhysicsDirectSpaceState3D::_collide_shape_into);
 	ClassDB::bind_method(D_METHOD("get_rest_info_into", "parameters", "result"), &PhysicsDirectSpaceState3D::_get_rest_info_into);
 
-	ClassDB::bind_method(D_METHOD("cast_ray_multi", "parameters", "result"), &PhysicsDirectSpaceState3D::_cast_ray_multi);
+	ClassDB::bind_method(D_METHOD("cast_ray", "parameters", "result"), &PhysicsDirectSpaceState3D::_cast_ray);
+	ClassDB::bind_method(D_METHOD("cast_shape", "parameters", "result"), &PhysicsDirectSpaceState3D::_cast_shape);
 }
