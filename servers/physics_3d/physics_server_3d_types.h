@@ -86,6 +86,7 @@ struct CastResult {
 	Vector3 contact_point; // same as position for rays, or shape contact point
 	Vector3 contact_normal; // same as normal for rays, or shape penetration axis (if penetrating, otherwise normal on shape I guess...have to check)
 
+	float fraction;
 	float penetration_depth = .0f;
 
 	RID rid;
@@ -102,13 +103,9 @@ struct CastResult {
 		}
 	}
 
-	_FORCE_INLINE_ float get_fraction(const Vector3 &p_start, const Vector3 &p_end) const {
-		const Vector3 delta = p_end - p_start;
-		return delta.is_zero_approx() ? .0f : (position - p_start).dot(delta) / delta.length_squared();
-	}
-
 	_FORCE_INLINE_ bool from_inside() const {
-		return penetration_depth > .0f;
+		// For ray casts we can't know the penetration depth, just check the fraction...
+		return fraction == .0f;
 	}
 
 	_FORCE_INLINE_ Vector3 get_other_contact_point() const {

@@ -951,39 +951,39 @@ int JoltPhysicsDirectSpaceState3D::cast_ray(const PS3DT::RayParameters &p_parame
 	settings.mBackFaceModeTriangles = back_face_mode;
 
 	auto hit_to_godot = [&](const JPH::RayCastResult &p_hit) -> std::optional<PS3DT::CastResult> {
-		if (!p_parameters.hit_from_inside || p_hit.mFraction > 0.0f) {
-			const JPH::BodyID &body_id = p_hit.mBodyID;
-			const JPH::SubShapeID &sub_shape_id = p_hit.mSubShapeID2;
+		const JPH::BodyID &body_id = p_hit.mBodyID;
+		const JPH::SubShapeID &sub_shape_id = p_hit.mSubShapeID2;
 
-			const JoltObject3D *object = space->try_get_object(body_id);
-			ERR_FAIL_NULL_V(object, { });
+		const JoltObject3D *object = space->try_get_object(body_id);
+		ERR_FAIL_NULL_V(object, { });
 
-			const JPH::RVec3 position = ray.GetPointOnRay(p_hit.mFraction);
-			JPH::Vec3 normal = object->get_jolt_body()->GetWorldSpaceSurfaceNormal(sub_shape_id, position);
+		const JPH::RVec3 position = ray.GetPointOnRay(p_hit.mFraction);
+		JPH::Vec3 normal = (!p_parameters.hit_from_inside || p_hit.mFraction > .0f)
+			? object->get_jolt_body()->GetWorldSpaceSurfaceNormal(sub_shape_id, position)
+			: JPH::Vec3::sZero();
 
-			// If we got a back-face normal we need to flip it.
-			if (normal.Dot(vector) > 0) {
-				normal = -normal;
-			}
-
-			PS3DT::CastResult new_result;
-
-			new_result.position = new_result.contact_point = to_godot(position);
-			new_result.normal = new_result.contact_normal = to_godot(normal);
-			new_result.rid = object->get_rid();
-			new_result.collider_id = object->get_instance_id();
-			new_result.shape = 0;
-
-			if (const JoltShapedObject3D *shaped_object = object->as_shaped()) {
-				const int shape_index = shaped_object->find_shape_index(sub_shape_id);
-				ERR_FAIL_COND_V(shape_index == -1, { });
-				new_result.shape = shape_index;
-				new_result.face_index = _try_get_face_index(*object->get_jolt_body(), sub_shape_id);
-			}
-
-			return new_result;
+		// If we got a back-face normal we need to flip it.
+		if (normal.Dot(vector) > 0) {
+			normal = -normal;
 		}
-		return { };
+
+		PS3DT::CastResult new_result;
+
+		new_result.position = new_result.contact_point = to_godot(position);
+		new_result.normal = new_result.contact_normal = to_godot(normal);
+		new_result.fraction = MAX(.0f, p_hit.mFraction);
+		new_result.rid = object->get_rid();
+		new_result.collider_id = object->get_instance_id();
+		new_result.shape = 0;
+
+		if (const JoltShapedObject3D *shaped_object = object->as_shaped()) {
+			const int shape_index = shaped_object->find_shape_index(sub_shape_id);
+			ERR_FAIL_COND_V(shape_index == -1, { });
+			new_result.shape = shape_index;
+			new_result.face_index = _try_get_face_index(*object->get_jolt_body(), sub_shape_id);
+		}
+
+		return new_result;
 	};
 
 	if (p_result_max == 1) {
@@ -1025,5 +1025,115 @@ int JoltPhysicsDirectSpaceState3D::cast_ray(const PS3DT::RayParameters &p_parame
 }
 
 int JoltPhysicsDirectSpaceState3D::cast_shape(const PS3DT::ShapeParameters &p_parameters, PS3DT::CastResult *r_results, int p_result_max) {
-	return 0;
+	ERR_FAIL_COND_V_MSG(space->is_stepping(), 0, "cast_shape must not be called while the physics space is being stepped.");
+
+	if (p_result_max <= 0) {
+		return 0;
+	}
+
+	space->flush_pending_objects();
+
+	JoltShape3D *shape = JoltPhysicsServer3D::get_singleton()->get_shape(p_parameters.shape_rid);
+	ERR_FAIL_NULL_V(shape, 0);
+
+	const JPH::ShapeRefC jolt_shape = shape->try_build();
+	ERR_FAIL_NULL_V(jolt_shape, 0);
+
+	Transform3D transform = p_parameters.transform;
+	JOLT_ENSURE_SCALE_NOT_ZERO(transform, "cast_shape was passed an invalid transform.");
+
+	Vector3 scale;
+	JoltMath::decompose(transform, scale);
+	JOLT_ENSURE_SCALE_VALID(jolt_shape, scale, "cast_shape was passed an invalid transform.");
+
+	const Vector3 com_scaled = to_godot(jolt_shape->GetCenterOfMass());
+	Transform3D transform_com = transform.translated_local(com_scaled);
+
+	JPH::RShapeCast shape_cast(jolt_shape, to_jolt(scale), to_jolt(transform_com), to_jolt(p_parameters.motion));
+
+	const JoltQueryFilter3D query_filter(*this, p_parameters.collision_mask, p_parameters.collide_with_bodies, p_parameters.collide_with_areas, p_parameters.exclude);
+
+	JPH::ShapeCastSettings settings;
+	settings.mCollectFacesMode = JPH::ECollectFacesMode::NoFaces; // #todoalex: make a flag for this? Not really necessary if I don't need the vertices of the triangle
+	settings.mExtraConvexRadius = (float)p_parameters.margin;
+	settings.mBackFaceModeConvex = p_parameters.hit_from_inside ? JPH::EBackFaceMode::CollideWithBackFaces : JPH::EBackFaceMode::IgnoreBackFaces;
+	settings.mBackFaceModeTriangles = p_parameters.hit_back_faces ? JPH::EBackFaceMode::CollideWithBackFaces : JPH::EBackFaceMode::IgnoreBackFaces;
+	settings.mUseShrunkenShapeAndConvexRadius = true; // #todoalex: test if it's better, or just keep it false
+	settings.mReturnDeepestPoint = p_parameters.hit_from_inside;
+
+	auto hit_to_godot = [&](const JPH::ShapeCastResult &p_hit) -> std::optional<PS3DT::CastResult> {
+		const JPH::BodyID &body_id = p_hit.mBodyID2;
+		const JPH::SubShapeID &sub_shape_id = p_hit.mSubShapeID2;
+
+		const JoltObject3D *object = space->try_get_object(body_id);
+		ERR_FAIL_NULL_V(object, { });
+
+		Vector3 normal = to_godot(object->get_jolt_body()->GetWorldSpaceSurfaceNormal(sub_shape_id, p_hit.mContactPointOn2));
+
+		// If we got a back-face normal we need to flip it.
+		if (normal.dot(p_parameters.motion) > 0) {
+			normal = -normal;
+		}
+
+		PS3DT::CastResult new_result;
+
+		new_result.position = transform.origin + p_parameters.motion * p_hit.mFraction;
+		new_result.normal = normal;
+
+		new_result.contact_point = to_godot(p_hit.mContactPointOn1);
+		new_result.contact_normal = to_godot(-p_hit.mPenetrationAxis.Normalized());
+
+		new_result.fraction = MAX(.0f, p_hit.mFraction);
+		new_result.penetration_depth = p_hit.mPenetrationDepth;
+
+		new_result.rid = object->get_rid();
+		new_result.collider_id = object->get_instance_id();
+		new_result.shape = 0;
+
+		if (const JoltShapedObject3D *shaped_object = object->as_shaped()) {
+			const int shape_index = shaped_object->find_shape_index(sub_shape_id);
+			ERR_FAIL_COND_V(shape_index == -1, { });
+			new_result.shape = shape_index;
+			new_result.face_index = _try_get_face_index(*object->get_jolt_body(), sub_shape_id);
+		}
+
+		return new_result;
+	};
+
+	if (p_result_max == 1) {
+		JoltQueryCollectorClosest<JPH::CastShapeCollector> collector;
+		space->get_narrow_phase_query().CastShape(shape_cast, settings, to_jolt(transform_com.origin), collector, query_filter, query_filter, query_filter);
+
+		if (!collector.had_hit()) {
+			return 0;
+		}
+
+		auto hit = hit_to_godot(collector.get_hit());
+		if (hit) {
+			*r_results = *hit;
+			return 1;
+		}
+
+		return 0;
+	} else {
+		JoltQueryCollectorClosestMulti<JPH::CastShapeCollector, 32> collector;
+		space->get_narrow_phase_query().CastShape(shape_cast, settings, to_jolt(transform_com.origin), collector, query_filter, query_filter, query_filter);
+
+		if (!collector.had_hit()) {
+			return 0;
+		}
+
+		const int hit_count = collector.get_hit_count();
+		int actual_hit_count = 0;
+
+		for (int i = 0; i < hit_count; ++i) {
+			auto hit = hit_to_godot(collector.get_hit(i));
+			if (hit) {
+				(*r_results++) = *hit;
+				++actual_hit_count;
+			}
+		}
+
+		return actual_hit_count;
+	}
 }
