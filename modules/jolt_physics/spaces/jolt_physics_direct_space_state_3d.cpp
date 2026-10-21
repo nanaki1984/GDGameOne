@@ -1049,7 +1049,7 @@ int JoltPhysicsDirectSpaceState3D::cast_shape(const PS3DT::ShapeParameters &p_pa
 	const Vector3 com_scaled = to_godot(jolt_shape->GetCenterOfMass());
 	Transform3D transform_com = transform.translated_local(com_scaled);
 
-	JPH::RShapeCast shape_cast(jolt_shape, to_jolt(scale), to_jolt(transform_com), to_jolt(p_parameters.motion));
+	JPH::RShapeCast shape_cast(jolt_shape, to_jolt_r(scale), to_jolt_r(transform_com), to_jolt_r(p_parameters.motion));
 
 	const JoltQueryFilter3D query_filter(*this, p_parameters.collision_mask, p_parameters.collide_with_bodies, p_parameters.collide_with_areas, p_parameters.exclude);
 
@@ -1102,7 +1102,7 @@ int JoltPhysicsDirectSpaceState3D::cast_shape(const PS3DT::ShapeParameters &p_pa
 
 	if (p_result_max == 1) {
 		JoltQueryCollectorClosest<JPH::CastShapeCollector> collector;
-		space->get_narrow_phase_query().CastShape(shape_cast, settings, to_jolt(transform_com.origin), collector, query_filter, query_filter, query_filter);
+		space->get_narrow_phase_query().CastShape(shape_cast, settings, to_jolt_r(transform_com.origin), collector, query_filter, query_filter, query_filter);
 
 		if (!collector.had_hit()) {
 			return 0;
@@ -1117,7 +1117,7 @@ int JoltPhysicsDirectSpaceState3D::cast_shape(const PS3DT::ShapeParameters &p_pa
 		return 0;
 	} else {
 		JoltQueryCollectorClosestMulti<JPH::CastShapeCollector, 32> collector;
-		space->get_narrow_phase_query().CastShape(shape_cast, settings, to_jolt(transform_com.origin), collector, query_filter, query_filter, query_filter);
+		space->get_narrow_phase_query().CastShape(shape_cast, settings, to_jolt_r(transform_com.origin), collector, query_filter, query_filter, query_filter);
 
 		if (!collector.had_hit()) {
 			return 0;
