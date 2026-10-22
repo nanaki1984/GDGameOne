@@ -76,7 +76,7 @@ public:
 			PERSPECTIVE,
 			ORTHOGONAL,
 			FRUSTUM,
-			MULTIVIEW_PROJECTION,
+			XR,
 		};
 		Type type;
 		float fov;
@@ -124,6 +124,9 @@ public:
 	virtual void camera_set_use_vertical_aspect(RID p_camera, bool p_enable);
 	virtual void camera_set_custom_culling_planes(RID p_camera, TypedArray<Plane> p_planes);
 	virtual bool is_camera(RID p_camera) const;
+#ifndef XR_DISABLED
+	virtual bool is_xr_camera(RID p_camera) const;
+#endif
 
 	/* OCCLUDER API */
 

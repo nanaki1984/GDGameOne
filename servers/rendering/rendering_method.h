@@ -63,6 +63,9 @@ public:
 	virtual void camera_set_use_vertical_aspect(RID p_camera, bool p_enable) = 0;
 	virtual void camera_set_custom_culling_planes(RID p_camera, TypedArray<Plane> p_planes) = 0;
 	virtual bool is_camera(RID p_camera) const = 0;
+#ifndef XR_DISABLED
+	virtual bool is_xr_camera(RID p_camera) const = 0;
+#endif
 
 	virtual RID occluder_allocate() = 0;
 	virtual void occluder_initialize(RID p_occluder) = 0;
