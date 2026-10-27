@@ -176,8 +176,10 @@ private:
 	void _set_platform_data(const PS3DT::MotionCollision &p_collision);
 	void _snap_on_floor(bool p_was_on_floor, bool p_vel_dir_facing_up);
 
-protected:
+public:
 	const Vector3 &get_up_direction() const;
+
+protected:
 	void set_up_direction(const Vector3 &p_up_direction);
 
 	void _notification(int p_what);
