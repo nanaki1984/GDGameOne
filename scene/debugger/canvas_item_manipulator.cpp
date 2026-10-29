@@ -571,7 +571,7 @@ bool CanvasItemManipulator::_gui_input_resize(const Ref<InputEvent> &p_event) {
 				};
 
 				DragType resize_drag = DRAG_NONE;
-				real_t radius = RESIZE_HANDLE_DIAMETER * (1.5f / 2.0f);
+				real_t radius = (RESIZE_HANDLE_DIAMETER / 2) * 1.5 * scale;
 
 				for (int i = 0; i < 4; i++) {
 					int prev = (i + 3) % 4;
@@ -1893,6 +1893,21 @@ bool CanvasItemManipulator::reset_temp_pivot() {
 	return false;
 }
 
+void CanvasItemManipulator::center_temp_pivot_on_selection() {
+	Array selection;
+	get_selection_callback.call(selection);
+
+	if (!selection.is_empty()) {
+		Vector2 center;
+		for (const Variant &var : selection) {
+			const CanvasItem *ci = Object::cast_to<CanvasItem>(var);
+			Transform2D xform = ci->get_screen_transform() * ci->get_transform().affine_inverse();
+			center += xform.xform(ci->_edit_get_position());
+		}
+		temp_pivot = center / selection.size();
+	}
+}
+
 void CanvasItemManipulator::set_shortcut(const ShortcutName p_name, const Ref<Shortcut> &p_shortcut) {
 	ERR_FAIL_INDEX(0, SHORTCUT_MAX);
 	inputs[p_name] = p_shortcut;
@@ -2213,6 +2228,7 @@ void CanvasItemManipulator::find_canvas_items_in_rect(const Rect2 &p_rect, Node 
 	if (!ci->is_set_as_top_level()) {
 		xform *= p_parent_xform;
 	}
+	xform *= ci->get_transform();
 
 	Rect2 rect = p_rect;
 	// Cameras don't affect `CanvasLayer`s.
@@ -2221,18 +2237,17 @@ void CanvasItemManipulator::find_canvas_items_in_rect(const Rect2 &p_rect, Node 
 		Window *root = SceneTree::get_singleton()->get_root();
 		rect = root->get_canvas_transform().affine_inverse().xform(p_rect);
 	}
-	rect = (xform * ci->get_transform()).affine_inverse().xform(rect);
 
 	bool selected = false;
 	if (ci->_edit_use_rect()) {
-		Rect2 ci_rect = ci->_edit_get_rect();
+		Rect2 ci_rect = xform.xform(ci->_edit_get_rect());
 		if (rect.has_point(ci_rect.position) &&
 				rect.has_point(ci_rect.position + Vector2(ci_rect.size.x, 0)) &&
 				rect.has_point(ci_rect.position + Vector2(ci_rect.size.x, ci_rect.size.y)) &&
 				rect.has_point(ci_rect.position + Vector2(0, ci_rect.size.y))) {
 			selected = true;
 		}
-	} else if (rect.has_point(Point2())) {
+	} else if (rect.has_point(xform.xform(Point2()))) {
 		selected = true;
 	}
 
@@ -2276,25 +2291,12 @@ void CanvasItemManipulator::set_tool(Tool p_tool) {
 	if (drag_type != DRAG_NONE) {
 		commit_drag();
 	}
+#endif
 
 	tool = p_tool;
 
-	if (p_tool == TOOL_EDIT_PIVOT && Input::get_singleton()->is_key_pressed(Key::SHIFT)) {
-		// Special action that places temporary rotation pivot in the middle of the selection.
-		Array selection;
-		get_selection_callback.call(selection);
-
-		if (!selection.is_empty()) {
-			Vector2 center;
-			for (const Variant &var : selection) {
-				const CanvasItem *ci = Object::cast_to<CanvasItem>(var);
-				center += ci->get_viewport()->get_popup_base_transform().xform(ci->_edit_get_position());
-			}
-			temp_pivot = center / selection.size();
-		}
-	}
-#else
-	tool = p_tool;
+#ifdef TOOLS_ENABLED
+	center_temp_pivot_on_selection();
 #endif
 }
 
