@@ -32,6 +32,8 @@
 
 #include <cstdint>
 
+#define GODOT_VARIABLE_TIMESTEP
+
 struct MainFrameTime {
 	double process_step; // delta time to advance during process()
 	int physics_steps; // number of times to iterate the physics engine
@@ -91,6 +93,8 @@ class MainTimerSync {
 	uint64_t last_cpu_ticks_usec = 0;
 	uint64_t current_cpu_ticks_usec = 0;
 
+#if !defined(GODOT_VARIABLE_TIMESTEP)
+
 	// logical game time since last physics timestep
 	double time_accum = 0;
 
@@ -109,9 +113,14 @@ class MainTimerSync {
 	// typical value for accumulated_physics_steps[i] is either this or this plus one
 	int typical_physics_steps[CONTROL_STEPS];
 
+#endif
+
 	int fixed_fps = 0;
 
 protected:
+
+#if !defined(GODOT_VARIABLE_TIMESTEP)
+
 	// returns the fraction of p_physics_step required for the timer to overshoot
 	// before advance_core considers changing the physics_steps return from
 	// the typical values as defined by typical_physics_steps
@@ -120,6 +129,8 @@ protected:
 	// gets our best bet for the average number of physics steps per render frame
 	// return value: number of frames back this data is consistent
 	int get_average_physics_steps(double &p_min, double &p_max);
+
+#endif
 
 	// advance physics clock by p_process_step, return appropriate number of steps to simulate
 	MainFrameTime advance_core(double p_physics_step, int p_physics_ticks_per_second, double p_process_step);

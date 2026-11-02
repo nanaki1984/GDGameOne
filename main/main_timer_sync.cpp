@@ -313,6 +313,8 @@ int64_t MainTimerSync::DeltaSmoother::smooth_delta(int64_t p_delta) {
 
 /////////////////////////////////////
 
+#if !defined(GODOT_VARIABLE_TIMESTEP)
+
 // returns the fraction of p_physics_step required for the timer to overshoot
 // before advance_core considers changing the physics_steps return from
 // the typical values as defined by typical_physics_steps
@@ -345,11 +347,15 @@ int MainTimerSync::get_average_physics_steps(double &p_min, double &p_max) {
 	return CONTROL_STEPS;
 }
 
+#endif
+
 // advance physics clock by p_process_step, return appropriate number of steps to simulate
 MainFrameTime MainTimerSync::advance_core(double p_physics_step, int p_physics_ticks_per_second, double p_process_step) {
 	MainFrameTime ret;
 
 	ret.process_step = p_process_step;
+
+#if !defined(GODOT_VARIABLE_TIMESTEP)
 
 	// simple determination of number of physics iteration
 	time_accum += ret.process_step;
@@ -425,6 +431,14 @@ MainFrameTime MainTimerSync::advance_core(double p_physics_step, int p_physics_t
 		}
 	}
 
+#else
+
+	const int max_sub_steps = Engine::get_singleton()->get_user_max_physics_steps_per_frame();
+	ret.process_step = MIN(ret.process_step, p_physics_step * max_sub_steps);
+	ret.physics_steps = CLAMP((int)Math::ceil(ret.process_step / p_physics_step), 1, max_sub_steps);
+
+#endif
+
 	return ret;
 }
 
@@ -434,13 +448,19 @@ MainFrameTime MainTimerSync::advance_checked(double p_physics_step, int p_physic
 		p_process_step = 1.0 / fixed_fps;
 	}
 
+#if !defined(GODOT_VARIABLE_TIMESTEP)
+
 	float min_output_step = p_process_step / 8;
 	min_output_step = MAX(min_output_step, 1E-6);
 
 	// compensate for last deficit
 	p_process_step += time_deficit;
 
+#endif
+
 	MainFrameTime ret = advance_core(p_physics_step, p_physics_ticks_per_second, p_process_step);
+
+#if !defined(GODOT_VARIABLE_TIMESTEP)
 
 	// we will do some clamping on ret.process_step and need to sync those changes to time_accum,
 	// that's easiest if we just remember their fixed difference now
@@ -501,6 +521,12 @@ MainFrameTime MainTimerSync::advance_checked(double p_physics_step, int p_physic
 	// i.e. the time in seconds taken by a physics tick
 	ret.interpolation_fraction = time_accum / p_physics_step;
 
+#else
+
+	ret.interpolation_fraction = 0.0;
+
+#endif
+
 	return ret;
 }
 
@@ -515,10 +541,16 @@ double MainTimerSync::get_cpu_process_step() {
 }
 
 MainTimerSync::MainTimerSync() {
+
+#if !defined(GODOT_VARIABLE_TIMESTEP)
+
 	for (int i = CONTROL_STEPS - 1; i >= 0; --i) {
 		typical_physics_steps[i] = i;
 		accumulated_physics_steps[i] = i;
 	}
+
+#endif
+
 }
 
 // start the clock
