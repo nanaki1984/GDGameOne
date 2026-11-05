@@ -153,6 +153,9 @@ if env.dev_build:
 if env.editor_build:
     env_jolt.Append(CPPDEFINES=["JPH_DEBUG_RENDERER"])
 
+#if env["profiler"] == "tracy":
+#    env_jolt.Append(CPPDEFINES=["JPH_EXTERNAL_PROFILE"])
+
 if env["precision"] == "double":
     env_jolt.Append(CPPDEFINES=["JPH_DOUBLE_PRECISION"])
 

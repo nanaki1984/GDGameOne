@@ -40,6 +40,12 @@
 #include "core/variant/variant.h"
 #endif
 
+#if defined(JPH_EXTERNAL_PROFILE)
+#include <Jolt/Core/Profiler.h>
+#include "core/templates/hash_map.h"
+#include "core/profiling/profiling.h"
+#endif
+
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
@@ -88,6 +94,29 @@ bool jolt_assert(const char *p_expr, const char *p_msg, const char *p_file, uint
 	ERR_PRINT(vformat("Jolt Physics assertion '%s' failed with message '%s' at '%s:%d'", p_expr, p_msg != nullptr ? p_msg : "", p_file, p_line));
 	return false;
 }
+
+#endif
+
+#if defined(JPH_EXTERNAL_PROFILE)
+
+JPH_NAMESPACE_BEGIN
+
+ExternalProfileMeasurement::ExternalProfileMeasurement(const char *inName, uint32 inColor) {
+	static thread_local HashMap<const char*, tracy::SourceLocationData> persistent_data;
+
+	auto it = persistent_data.find(inName);
+	if (!it) {
+		it = persistent_data.insert(inName, { inName, "", "", 0, inColor });
+	}
+
+	new (mUserData) tracy::ScopedZone(&it->value);
+}
+
+ExternalProfileMeasurement::~ExternalProfileMeasurement() {
+	reinterpret_cast<tracy::ScopedZone*>(mUserData)->~ScopedZone();
+}
+
+JPH_NAMESPACE_END
 
 #endif
 
