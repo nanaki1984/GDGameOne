@@ -5135,6 +5135,10 @@ bool Main::iteration() {
 	NavigationServer3D::get_singleton()->process(process_step * time_scale);
 #endif // NAVIGATION_3D_DISABLED
 
+	// #todoalex: do a late_process? will sync again with physics to remove the 1 step delay also.
+	// It will not be a "physics" frame (_in_physics stil false), but physics APIs will be available in this late_process.
+	// Also remember to call stuff on Input for agile input event flushing, before calling late_process (after syncing with physics). (JUST FOR ANDROID, who cares)
+
 	GodotProfileZoneGrouped(_profile_zone, "RenderingServer::sync");
 	RenderingServer::get_singleton()->sync(); //sync if still drawing from previous frames.
 
