@@ -1080,7 +1080,7 @@ int JoltPhysicsDirectSpaceState3D::cast_shape(const PS3DT::ShapeParameters &p_pa
 		new_result.position = transform.origin + p_parameters.motion * p_hit.mFraction;
 		new_result.normal = normal;
 
-		new_result.contact_point = to_godot(p_hit.mContactPointOn1);
+		new_result.contact_point = transform_com.origin + to_godot(p_hit.mContactPointOn1);
 		new_result.contact_normal = to_godot(-p_hit.mPenetrationAxis.Normalized());
 
 		new_result.fraction = MAX(.0f, p_hit.mFraction);
