@@ -97,11 +97,11 @@ public:
 		double delta = 0.0;
 		double start = 0.0;
 		double end = 0.0;
-		real_t weight = 0.0;
-		Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
-		uint8_t flags{ PI_FLAGS_DEFAULT };
 		bool seeked = false;
 		bool is_external_seeking = false;
+		Animation::LoopedFlag looped_flag = Animation::LOOPED_FLAG_NONE;
+		uint8_t flags{ PI_FLAGS_DEFAULT };
+		real_t weight = 0.0;
 
 		_FORCE_INLINE_ bool has_flag(PlaybackInfoFlags p_flag) const { return p_flag == (flags & p_flag); }
 		_FORCE_INLINE_ void add_flag(PlaybackInfoFlags p_flag) { flags |= p_flag; }
